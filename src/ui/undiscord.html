@@ -1,0 +1,169 @@
+<div id="undiscord" class="browser container" style="display:none;">
+    <div class="header">
+        <svg class="icon" aria-hidden="false" width="24" height="24" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M15 3.999V2H9V3.999H3V5.999H21V3.999H15Z"></path>
+            <path fill="currentColor"
+                d="M5 6.99902V18.999C5 20.101 5.897 20.999 7 20.999H17C18.103 20.999 19 20.101 19 18.999V6.99902H5ZM11 17H9V11H11V17ZM15 17H13V11H15V17Z">
+            </path>
+        </svg>
+        <h3>Undiscord Lite</h3>
+        <div class="vert-divider"></div>
+        <span> Bulk delete messages</span>
+        <div class="spacer"></div>
+        <div id="hide" class="icon" aria-label="Close" role="button" tabindex="0">
+            <svg aria-hidden="false" width="24" height="24" viewBox="0 0 24 24">
+                <path fill="currentColor"
+                    d="M18.4 4L12 10.4L5.6 4L4 5.6L10.4 12L4 18.4L5.6 20L12 13.6L18.4 20L20 18.4L13.6 12L20 5.6L18.4 4Z">
+                </path>
+            </svg>
+        </div>
+    </div>
+    <div class="window-body" style="display: flex; flex-direction: row;">
+        <div class="sidebar scroll">
+            <details open>
+                <summary>General</summary>
+                <fieldset>
+                    <legend>Author ID</legend>
+                    <div class="input-wrapper">
+                        <input class="input" id="authorId" type="text">
+                    </div>
+                    <div class="input-actions">
+                        <button id="getAuthor">me</button>
+                    </div>
+                </fieldset>
+                <hr>
+                <fieldset>
+                    <legend>Server ID</legend>
+                    <div class="input-wrapper">
+                        <input class="input" id="guildId" type="text">
+                    </div>
+                    <div class="input-actions">
+                        <button id="setGuild">set</button>
+                        <button id="addGuild">add</button>
+                        <button id="delGuild">del</button>
+                    </div>
+                </fieldset>
+                <fieldset>
+                    <legend>Channel ID</legend>
+                    <div class="input-wrapper">
+                        <input class="input" id="channelId" type="text">
+                    </div>
+                    <div class="input-actions">
+                        <button id="setChannel">set</button>
+                        <button id="addChannel">add</button>
+                        <button id="delChannel">del</button>
+                    </div>
+                    <div id="queueCounter"></div>
+                    <div class="sectionDescription">
+                        <label class="row"><input id="includeNsfw" type="checkbox">This is a NSFW channel</label>
+                    </div>
+                    <div class="sectionDescription tips">
+                        <div>› Leave Channel ID's empty to target the entire server.</div>
+                        <div>› Use 'set' to override all with the current server/channel.</div>
+                        <div>› Use 'add' to add the current server/channel to a batch job.</div>
+                        <div>› Use 'del' to remove the current server/channel from the batch.</div>
+                    </div>
+                </fieldset>
+            </details>
+            <hr>
+            <details>
+                <summary>Filter</summary>
+                <fieldset>
+                    <legend>Search</legend>
+                    <div class="input-wrapper">
+                        <input id="search" type="text" placeholder="Containing text">
+                    </div>
+                    <div class="sectionDescription">
+                        Only delete messages that contain the text
+                    </div>
+                    <div class="sectionDescription">
+                        <label><input id="hasLink" type="checkbox">has: link</label>
+                    </div>
+                    <div class="sectionDescription">
+                        <label><input id="hasFile" type="checkbox">has: file</label>
+                    </div>
+                    <div class="sectionDescription">
+                        <label><input id="includePinned" type="checkbox">Include pinned</label>
+                    </div>
+                </fieldset>
+            </details>
+            <details>
+                <summary>Messages interval</summary>
+                <fieldset>
+                    <legend>Interval of messages</legend>
+                    <div class="input-wrapper mb1">
+                        <input id="minId" type="text" placeholder="After a message ID">
+                    </div>
+                    <div class="input-wrapper">
+                        <input id="maxId" type="text" placeholder="Before a message ID">
+                    </div>
+                    <div class="sectionDescription">
+                        Specify an interval to delete messages. Right-click a message in Discord → Copy Message ID.
+                    </div>
+                </fieldset>
+            </details>
+            <details>
+                <summary>Date interval</summary>
+                <fieldset>
+                    <legend>After date</legend>
+                    <div class="input-wrapper mb1">
+                        <input id="minDate" type="datetime-local" title="Messages posted AFTER this date">
+                    </div>
+                    <legend>Before date</legend>
+                    <div class="input-wrapper">
+                        <input id="maxDate" type="datetime-local" title="Messages posted BEFORE this date">
+                    </div>
+                    <div class="sectionDescription">
+                        Delete messages that were posted between the two dates.
+                    </div>
+                    <div class="sectionDescription">
+                        * Filtering by date doesn't work if you use the "Messages interval".
+                    </div>
+                </fieldset>
+            </details>
+            <hr>
+            <details>
+                <summary>Advanced settings</summary>
+                <fieldset>
+                    <legend>Search delay</legend>
+                    <div class="input-wrapper">
+                        <input id="searchDelay" type="range" value="30000" step="100" min="100" max="60000">
+                        <div id="searchDelayValue"></div>
+                    </div>
+                </fieldset>
+                <fieldset>
+                    <legend>Delete delay</legend>
+                    <div class="input-wrapper">
+                        <input id="deleteDelay" type="range" value="1000" step="50" min="50" max="10000">
+                        <div id="deleteDelayValue"></div>
+                    </div>
+                    <br>
+                    <div class="sectionDescription">
+                        This will affect the speed in which the messages are deleted.
+                    </div>
+                </fieldset>
+            </details>
+        </div>
+        <div class="main col">
+            <div class="tbar col">
+                <div class="row">
+                    <button id="start" class="sizeMedium danger" style="width: 150px;" title="Start the deletion process">▶︎ Delete</button>
+                    <button id="stop" class="sizeMedium" title="Stop the deletion process" disabled>🛑 Stop</button>
+                    <button id="clear" class="sizeMedium">Clear log</button>
+                </div>
+                <div class="row">
+                    <progress id="progressBar" style="display:none;"></progress>
+                </div>
+            </div>
+            <pre id="logArea" class="logarea scroll"></pre>
+            <div class="tbar footer row">
+                <div id="progressPercent"></div>
+                <span class="spacer"></span>
+                <label>
+                    <input id="autoScroll" type="checkbox" checked> Auto scroll
+                </label>
+                <div class="resize-handle"></div>
+            </div>
+        </div>
+    </div>
+</div>

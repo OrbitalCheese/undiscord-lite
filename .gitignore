@@ -1,0 +1,16 @@
+# Local-only directories
+.claude/
+.vscode/
+.git.backup/
+
+# Node — only relevant if someone ever runs `npm i` (we have zero deps)
+node_modules/
+package-lock.json
+
+# Logs
+*.log
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
