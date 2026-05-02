@@ -83,7 +83,11 @@ class UndiscordCore {
     deleteDelay: null,
     maxEmptyPageRetries: 5, // re-fetch this many times when grandTotal says more remain but the page is empty
     askForConfirmation: true,
-    streamerMode: false, // redact message content in the confirmation preview and per-delete log
+    streamerMode: false, // redact message content AND author usernames in the confirmation preview and per-delete log
+    // When set, run() pulls pages from this source's fetchPage() instead of
+    // calling Discord's search API. Used by the data-export import flow to
+    // skip the search phase entirely. See src/export-import.js#ImportSource.
+    importSource: null,
   };
 
   state = {
@@ -93,7 +97,7 @@ class UndiscordCore {
     grandTotal: 0,
     offset: 0,
     emptyPageRetry: 0,
-    endReason: null, // 'completed' | 'empty-page-exhausted' | 'user-stopped' | 'user-declined' | 'auth-expired' | 'fetch-error' | 'api-error'
+    endReason: null, // 'completed' | 'no-matches' | 'empty-page-exhausted' | 'user-stopped' | 'user-declined' | 'auth-expired' | 'fetch-error' | 'api-error'
     _userDeleteDelay: 0, // baseline the user chose; options.deleteDelay decays back toward this after 429 bumps
     _userSearchDelay: 0, // baseline the user chose; options.searchDelay decays back toward this after 429 bumps
 
@@ -190,10 +194,18 @@ class UndiscordCore {
       }
 
       log.verb('Fetching messages...');
-      await this.search();
+      if (this.options.importSource) {
+        // Import mode: pull the next page from the in-memory imported list
+        // instead of calling Discord's search API. fetchPage() is synchronous
+        // and never throws — no rate-limit / network handling needed here.
+        this.options.importSource.fetchPage(this);
+      } else {
+        await this.search();
+      }
 
       // search() can short-circuit on stop during a 202/429 cooldown, returning
       // before _searchResponse is populated. Bail out cleanly in that case.
+      // (Import mode populates synchronously, but the bail check is harmless.)
       if (!this.state.running || this.#runId !== myRunId) return;
 
       await this.filterResponse();
@@ -241,6 +253,21 @@ class UndiscordCore {
       }
       else {
         // Empty page. Decide whether to retry (search index lag is common) or stop (truly done).
+
+        // Import-mode short-circuit: an exhausted ImportSource means we've handed
+        // out every record we have. There's no search index to wait on, so the
+        // empty-page-retry budget doesn't apply — finalize immediately.
+        if (this.options.importSource && this.options.importSource.exhausted) {
+          if (this.state.delCount + this.state.failCount === 0 && this.state.grandTotal === 0) {
+            this.state.endReason = 'no-matches';
+          } else {
+            this.state.endReason = 'completed';
+          }
+          if (inBatch) break;
+          this.state.running = false;
+          break;
+        }
+
         const expectedRemaining = this.state.grandTotal - (this.state.delCount + this.state.failCount);
         const max = this.options.maxEmptyPageRetries;
 
@@ -269,9 +296,13 @@ class UndiscordCore {
         }
       }
 
-      // wait before next page (fix search page not updating fast enough)
-      log.verb(`Waiting ${(this.options.searchDelay / 1000).toFixed(2)}s before next page...`);
-      await this.#wait(this.options.searchDelay);
+      // Wait before next page (gives Discord's search index time to catch up).
+      // Skipped in import mode — there's no API call to pace, so trailing waits
+      // would just stretch the wipe for no gain.
+      if (!this.options.importSource) {
+        log.verb(`Waiting ${(this.options.searchDelay / 1000).toFixed(2)}s before next page...`);
+        await this.#wait(this.options.searchDelay);
+      }
 
     } while (this.state.running);
 
@@ -332,6 +363,12 @@ class UndiscordCore {
   calcEtr() {
     const remaining = this.state.grandTotal - this.state.delCount - this.state.failCount;
     if (remaining <= 0) { this.stats.etr = 0; return; }
+    // Import mode: only deleteDelay applies — there's no per-page search cost,
+    // so the formula collapses to (deletes left × delay between deletes).
+    if (this.options.importSource) {
+      this.stats.etr = remaining * this.options.deleteDelay;
+      return;
+    }
     const avgN = this.stats.avgPostsInPage > 0 ? this.stats.avgPostsInPage : 25;
     const perPageCost = this.options.searchDelay + (avgN * this.options.deleteDelay);
     this.stats.etr = (perPageCost / avgN) * remaining;

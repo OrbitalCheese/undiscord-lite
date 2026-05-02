@@ -16,6 +16,13 @@ export const toSnowflake = (date) => {
   return Math.max(0, offset) * Math.pow(2, 22);
 };
 
+// Inverse of toSnowflake — extract the millisecond timestamp embedded in a
+// snowflake. Used by the import-mode pre-pass to apply the user's Messages
+// interval bounds to a flat (channel, message) list pulled from the data export.
+// BigInt handles 64-bit snowflakes without precision loss; the final Number()
+// cast is safe because timestamps fit in 53 bits well into the year 287000.
+export const snowflakeToMs = (sn) => Number((BigInt(sn) >> 22n) + 1420070400000n);
+
 // ---------- DOM helpers ----------
 
 export function createElm(html) {

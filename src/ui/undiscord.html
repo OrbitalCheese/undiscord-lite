@@ -18,7 +18,7 @@
     </div>
     <div class="window-body" style="display: flex; flex-direction: row;">
         <div class="sidebar scroll">
-            <details open>
+            <details id="sectionGeneral" open>
                 <summary>General<button class="help-btn" data-help="tabGeneral" title="Show help for the General tab">Help</button></summary>
                 <fieldset>
                     <legend>Author ID</legend>
@@ -76,7 +76,21 @@
                 <div id="queueCounter"></div>
             </details>
             <hr>
-            <details>
+            <details id="sectionImport">
+                <summary>Import data export<button class="help-btn" data-help="importExport" title="Show help for Import data export">Help</button></summary>
+                <fieldset>
+                    <legend>Import folder</legend>
+                    <button class="help-btn" data-help="importExport" title="Show help for Import data export">Help</button>
+                    <input id="importPicker" type="file" webkitdirectory directory multiple style="display:none;">
+                    <div class="input-actions">
+                        <button id="importPick" title="Pick the unzipped 'messages/' folder of your Discord data export">Select Folder...</button>
+                        <button id="importClear" title="Clear the loaded import and return to live-search mode">Clear Import</button>
+                    </div>
+                    <div id="importSummary" class="sectionDescription" style="margin-top: 6px;">No import loaded.</div>
+                </fieldset>
+            </details>
+            <hr>
+            <details id="sectionSearchFilter">
                 <summary>Search filter<button class="help-btn" data-help="tabSearchFilter" title="Show help for the Search filter tab">Help</button></summary>
                 <fieldset>
                     <legend>Include text</legend>
@@ -125,14 +139,14 @@
                 </fieldset>
             </details>
             <hr>
-            <details>
+            <details id="sectionDeleteFilter">
                 <summary>Delete filter<button class="help-btn" data-help="tabDeleteFilter" title="Show help for the Delete filter tab">Help</button></summary>
                 <fieldset>
                     <legend>Skip text</legend>
                     <button class="help-btn" data-help="excludeText" title="Show help for Skip text">Help</button>
                     <div class="input-wrapper">
                         <input class="clearable" id="excludeSearch" type="text" placeholder="Skip messages containing">
-                        <button class="clear-btn" id="clearExcludeSearch" title="Clear Exclude text">Clear</button>
+                        <button class="clear-btn" id="clearExcludeSearch" title="Clear Skip text">Clear</button>
                     </div>
                     <div class="sectionDescription" style="margin-top: 6px;">
                         <label class="row" style="margin-bottom: 0;" title="Substring: term appears anywhere in the message. Exact: term must appear as a standalone word.">Match:&nbsp;
@@ -163,7 +177,7 @@
                     </div>
                     <div class="input-wrapper">
                         <input class="clearable" id="excludeMentionsId" type="text" placeholder="Mentions user ID">
-                        <button class="clear-btn" id="clearExcludeMentions" title="Clear Exclude mentions user IDs">Clear</button>
+                        <button class="clear-btn" id="clearExcludeMentions" title="Clear Skip mentions user IDs">Clear</button>
                     </div>
                     <div class="input-actions">
                         <button id="selectExcludeMentions" title="Click, then click a user or message in Discord to capture their User ID">Select</button>
@@ -243,7 +257,8 @@
                     <button id="start" class="sizeMedium danger" style="width: 150px;" title="Start the deletion process">▶︎ Delete</button>
                     <button id="stop" class="sizeMedium" title="Stop the deletion process" disabled>🛑 Stop</button>
                     <button id="clear" class="sizeMedium">Clear Log</button>
-                    <label class="row" style="margin-left: 12px; margin-bottom: 0;" title="Redact message content in the log preview"><input id="streamerMode" type="checkbox" checked>Streamer mode</label>
+                    <span id="importBadge" class="import-badge" style="display:none;" title="An imported export is loaded. The General queue, Search filter, and Delete filter sections are ignored — only Date and Messages interval still apply.">import mode</span>
+                    <label class="row" style="margin-left: 12px; margin-bottom: 0;" title="Redact message content AND usernames in the log + confirmation preview"><input id="streamerMode" type="checkbox" checked>Streamer mode</label>
                 </div>
                 <div class="row">
                     <progress id="progressBar" style="display:none;"></progress>

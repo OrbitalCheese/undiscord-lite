@@ -5,9 +5,10 @@ import undiscordTemplate from './ui/undiscord.html';
 
 import UndiscordCore from './undiscord-core';
 import Drag from './ui/drag';
+import { parseExport, summarizeImport, ImportSource } from './export-import';
 import {
   createElm, insertCss, log, setLogFn, msToHMS,
-  getAuthorId, getGuildId, getChannelId, fillToken,
+  getAuthorId, getGuildId, getChannelId, fillToken, snowflakeToMs,
 } from './helpers';
 
 const buttonHtml = `<div id="undiscord-btn" tabindex="0" role="button" aria-label="Delete Messages" title="Delete Messages with Undiscord Lite">
@@ -34,6 +35,12 @@ const ui = {
   percent: null,
 };
 const $ = s => ui.undiscordWindow.querySelector(s);
+
+// Loaded Discord data export (post-parse). Null when no import is active.
+// Shape: { messages, channelCount, oldestTs, newestTs } as returned by parseExport().
+// When set, startAction() routes through startImportAction() and the General /
+// Search filter / Delete filter UI sections grey out (CSS via .import-mode).
+let importedSet = null;
 
 // Channel input uses ';' to separate per-server groups, ',' between channels in a group.
 // e.g. server="X,Y" + channel="C1,C2;C3" → X gets C1+C2, Y gets C3.
@@ -356,11 +363,9 @@ function initUI() {
     const id = getAuthorId();
     if (id) $('input#authorId').value = id;
   };
-  // Server / Channel selection now uses the global selection-mode infrastructure
-  // (sel buttons), wired up alongside the other Select bindings below. The old
-  // URL-context-based setGuild/setChannel handlers are gone; the same workflow
-  // is achievable by clicking sel and then clicking the target in Discord.
-  // Add Server queues (currentServer, '') as a server-wide wipe.
+  // Add Server queues (currentServer, '') as a server-wide wipe; the current
+  // server is read from Discord's URL. Point-and-click capture for the same
+  // input lives below under the Select bindings.
   $('button#addGuild').onclick = () => addPair(getGuildId(), '');
   // Add Channel queues (currentServer, currentChannel) as a specific-channel entry.
   $('button#addChannel').onclick = () => {
@@ -431,6 +436,9 @@ function initUI() {
   $('input#channelId').addEventListener('input', renderQueue);
   renderQueue();
 
+  // Import data export — folder picker, summary, clear button.
+  bindImportControls();
+
   // Stepper controls for search/delete delays. User-driven changes go straight to
   // core options + decay baseline. Rate-limit bumps inside core can still push the
   // effective delay above the user's max temporarily; it decays back to the baseline.
@@ -454,8 +462,7 @@ function initUI() {
 
   // Point-and-click ID capture: each Select button arms a global click listener;
   // the next click on a Discord user/avatar/message/server-icon/channel extracts
-  // the relevant ID. Server and Channel sel buttons replace the old URL-based
-  // setGuild/setChannel — same workflow, just click instead of view-and-press.
+  // the relevant ID. Hold Shift to capture multiple in a row without exiting.
   bindSelector('selectAuthor',         'authorId',         'user',    'Author ID');
   bindSelector('selectGuild',          'guildId',          'server',  'Server ID');
   bindSelector('selectChannel',        'channelId',        'channel', 'Channel ID');
@@ -612,7 +619,7 @@ const HELP_TEXT = {
     lines: [
       "Narrows what Discord's search API returns before the script considers anything for deletion. Server-side filters are faster than client-side ones.",
       "Three groups: <b>Include text</b>, <b>Include attachment type</b>, <b>Include @user</b>. Each has its own [Help] for details.",
-      "Anything Discord returns can still be excluded post-search via the <b>Delete filter</b> tab.",
+      "Anything Discord returns can still be excluded post-search via the <b>Delete filter</b> section.",
     ],
   },
   tabDeleteFilter: {
@@ -634,7 +641,7 @@ const HELP_TEXT = {
   tabDateInterval: {
     name: 'Date interval',
     lines: [
-      "Bound the wipe by date. Use the date pickers, or click <b>1 day</b> / <b>1 week</b> / <b>all</b> for convenience presets.",
+      "Bound the wipe by date. Use the date pickers, or click <b>1 Day</b> / <b>1 Week</b> / <b>All</b> for convenience presets.",
       "Pre-2015 and future dates auto-clamp on input with a warning. After defaults to Discord's launch (2015-01-01).",
       "Ignored if <b>Messages interval</b> is also set.",
     ],
@@ -643,7 +650,7 @@ const HELP_TEXT = {
     name: 'Advanced settings',
     lines: [
       "Tune the per-page wait (<b>Search delay</b>) and per-delete pause (<b>Delete delay</b>).",
-      "Both auto-bump on Discord's 429 rate-limit responses, then decay back toward your slider value as subsequent requests succeed.",
+      "Both auto-bump on Discord's 429 rate-limit responses, then decay back toward your stepper value as subsequent requests succeed.",
       "Defaults (45000 ms search / 1000 ms delete) are tuned to never trigger 429s. Lower at your own risk.",
     ],
   },
@@ -666,8 +673,10 @@ const HELP_TEXT = {
     name: 'Server ID',
     lines: [
       "The Discord Server (Guild) where messages should be deleted.",
-      "Click <b>set</b> while viewing a server to fill the field from your current location.",
-      "Click <b>add</b> to queue this server alongside others — supports any number of servers in one batch run.",
+      "Click <b>Add</b> while viewing a server to queue it (server-wide wipe — current Server ID is read from Discord's URL).",
+      "Click <b>Select</b> to enter point-and-click capture mode, then click any server icon in Discord to queue it. Hold Shift to capture several in a row.",
+      "Click <b>Delete</b> to remove the current server from the queue.",
+      "Multiple servers can be queued — the run processes them sequentially as one batch.",
       "An empty <b>Channel ID</b> with this set means <i>wipe the entire server</i> (every channel you have access to).",
       "Right-click a server icon &rarr; <b>Copy Server ID</b> (Developer Mode required).",
     ],
@@ -676,8 +685,9 @@ const HELP_TEXT = {
     name: 'Channel ID',
     lines: [
       "Restrict the wipe to a specific channel inside the queued server.",
-      "Click <b>set</b>/<b>add</b> while inside a channel to populate from your current view.",
-      "Click <b>del</b> to remove the current channel from the queue. If it's the last channel under that server, the server reverts to a server-wide wipe.",
+      "Click <b>Add</b> while inside a channel to queue (currentServer, currentChannel) — both are read from Discord's URL.",
+      "Click <b>Select</b> to enter point-and-click capture mode, then click any channel (or any message inside one) in Discord. Hold Shift to capture several in a row.",
+      "Click <b>Delete</b> to remove the current channel from the queue. Removing the last channel under a server widens it back to a server-wide wipe.",
       "Leave empty (with a Server ID set) to target the whole server.",
       "Right-click a channel name &rarr; <b>Copy Channel ID</b> (Developer Mode required).",
     ],
@@ -685,9 +695,8 @@ const HELP_TEXT = {
   dms: {
     name: 'DMs',
     lines: [
-      "Click <b>Add DM's</b> to queue every DM channel currently open in your sidebar — both 1:1 and group DMs.",
+      "Click <b>Add DM's</b> to queue every 1:1 DM channel currently open in your sidebar. Group DMs are skipped by default — toggle the <b>group DMs</b> pill (red/off &rarr; green/on) to include them too.",
       "Click <b>Clear DM's</b> to remove every queued DM at once.",
-      "The <b>group DMs</b> pill controls whether group DMs are included in the bulk add. Default red/off skips them; toggle green/on to include them.",
       "DMs you've X'd out of the sidebar aren't returned by Discord's API — re-open them in Discord first if you need them included.",
       "Uses Discord's <code>GET /users/@me/channels</code> endpoint with your existing auth token.",
     ],
@@ -760,7 +769,7 @@ const HELP_TEXT = {
     name: 'Date interval',
     lines: [
       "Bound the search to messages posted between two dates.",
-      "Use the datetime pickers, or click <b>1 day</b> / <b>1 week</b> / <b>all</b> for convenience presets.",
+      "Use the datetime pickers, or click <b>1 Day</b> / <b>1 Week</b> / <b>All</b> for convenience presets.",
       "<b>After date</b> defaults to Discord's launch (2015-01-01) so the lower bound is always explicit.",
       "Both fields auto-clamp to <code>[2015-01-01, now]</code> on input — out-of-range values snap and log a warning.",
       "If only one bound is set, the other is unbounded.",
@@ -773,7 +782,7 @@ const HELP_TEXT = {
       "Time the script waits between fetching pages of messages from Discord's search API.",
       "Range <b>15000–60000 ms</b>, default <b>45000 ms</b> (45s).",
       "Lower = faster but more 429 rate-limit hits. Discord throttles search aggressively below ~30s.",
-      "On a 429, the effective delay auto-bumps to whatever Discord asks for, then decays back toward your slider value as subsequent requests succeed (half-life decay).",
+      "On a 429, the effective delay auto-bumps to whatever Discord asks for, then decays back toward your stepper value as subsequent requests succeed (half-life decay).",
       "Click <b>↺</b> to reset to default.",
     ],
   },
@@ -785,6 +794,19 @@ const HELP_TEXT = {
       "Lower = faster, but more risk of mid-run rate-limiting.",
       "Same auto-bump and half-life-decay behavior as Search delay.",
       "Click <b>↺</b> to reset to default.",
+    ],
+  },
+  importExport: {
+    name: 'Import data export',
+    lines: [
+      "Pre-load message IDs from your Discord data export and skip the search phase entirely. Roughly <b>3-5x faster</b> than search-mode on large wipes, with no risk of \"search index lag\" empty-page failures.",
+      "<b>How to get an export:</b> Discord settings &rarr; Privacy &amp; Safety &rarr; <b>Request All My Data</b>. Discord emails you a ZIP after a few minutes (sometimes a few days). Unzip it locally — inside is a <code>messages/</code> folder.",
+      "<b>How to use it:</b> Click <b>Select Folder...</b> and pick that <code>messages/</code> folder. The summary line fills in (total messages, channel count, oldest/newest date). Set Date or Messages interval if you want to bound the wipe. Click <b>▶︎ Delete</b>.",
+      "<b>What still applies:</b> Date interval, Messages interval, Delete delay, Streamer mode. Pre-pass filters the imported set by date / snowflake before the run starts.",
+      "<b>What doesn't apply:</b> Author / Server / Channel / DMs queue, Search filter, Delete filter (most categories rely on data the export doesn't carry — mentions, embeds, pin status). Those sections grey out when an import is loaded.",
+      "<b>Edge cases:</b> Already-deleted messages return 404 (counted as failed but harmless). Channels you've lost access to (banned, deleted, etc) return 403 (same).",
+      "<b>Privacy:</b> the export is parsed in-browser. Nothing is uploaded — there is no code path that sends imported data anywhere. The export contains every DM you've ever had; don't commit <code>messages/</code> to a git repo (the bundled <code>.gitignore</code> covers this).",
+      "Click <b>Clear Import</b> to drop the loaded set and return to live-search mode.",
     ],
   },
 };
@@ -1060,8 +1082,8 @@ function handleSelectionClick(e) {
 
 // Unified keydown/keyup handler:
 //   - Esc cancels selection mode entirely.
-//   - Shift down/up toggles the shift-lock visual on the active button (green
-//     while held, amber otherwise).
+//   - Shift down/up toggles the shift-lock visual on the active button (light
+//     purple while held, amber otherwise — see .shift-locked rule in styles.css).
 function handleSelectionKey(e) {
   if (e.key === 'Escape' && e.type === 'keydown') {
     cancelSelection();
@@ -1320,11 +1342,167 @@ async function checkBatchPermissions(jobs, authToken) {
   return false;
 }
 
+// ---- Import data export ----
+
+// Wires the file picker, the Clear-import button, and renders the summary line.
+// Idempotent: safe to call once on init. The picker's <input> is hidden — the
+// visible Select Folder... button just triggers a click on it (browser-standard
+// pattern for getting a styled file picker without an ugly default).
+function bindImportControls() {
+  const picker = $('input#importPicker');
+
+  $('button#importPick').onclick = () => picker.click();
+
+  picker.addEventListener('change', async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    log.info(`Parsing ${files.length} file${files.length === 1 ? '' : 's'} from import...`);
+    let parsed;
+    try {
+      parsed = await parseExport(files);
+    } catch (err) {
+      log.error('Import failed:', err.message || String(err));
+      // Reset the input so picking the same folder again still fires `change`.
+      picker.value = '';
+      return;
+    }
+    importedSet = parsed;
+    renderImportSummary();
+    ui.undiscordWindow.classList.add('import-mode');
+    $('#importBadge').style.display = 'inline-flex';
+    log.success(`Import loaded: ${parsed.messages.length.toLocaleString()} messages across ${parsed.channelCount} channel${parsed.channelCount === 1 ? '' : 's'}.`);
+    // Per-source breakdown — pulled from channel.json (guild + name) and
+    // index.json (DM friend usernames; recipients in channel.json are IDs only).
+    log.info('── IMPORT BREAKDOWN ──');
+    for (const line of summarizeImport(parsed)) log.info(`› ${line}`);
+    log.info('General queue, Search filter, and Delete filter are now bypassed. Date and Messages interval still apply.');
+    // Reset so re-picking works.
+    picker.value = '';
+  });
+
+  $('button#importClear').onclick = () => {
+    if (!importedSet) return log.info('No import loaded.');
+    importedSet = null;
+    renderImportSummary();
+    ui.undiscordWindow.classList.remove('import-mode');
+    $('#importBadge').style.display = 'none';
+    log.info('Import cleared. Returning to live-search mode.');
+  };
+
+  renderImportSummary();
+}
+
+function renderImportSummary() {
+  const el = $('#importSummary');
+  if (!importedSet) {
+    el.textContent = 'No import loaded.';
+    return;
+  }
+  const { messages, channelCount, oldestTs, newestTs } = importedSet;
+  const fmt = (ts) => ts ? new Date(ts).toISOString().slice(0, 10) : '—';
+  el.textContent = `Imported ${messages.length.toLocaleString()} messages across ${channelCount} channel${channelCount === 1 ? '' : 's'} · oldest ${fmt(oldestTs)} · newest ${fmt(newestTs)}`;
+}
+
+// Import-mode entry point — peer of startAction(). Skips the queue, permission
+// check, and most filter inputs; pre-filters the imported set by Date/Messages
+// interval; builds a single synthetic job carrying an ImportSource into core.
+async function startImportAction() {
+  if (!importedSet) return log.error('Import mode active but no imported set — clear and re-import.');
+
+  // Date / Messages interval: applied as a client-side pre-pass against each
+  // record's ISO timestamp. Messages interval (snowflake range) wins when both
+  // are set, mirroring search-mode precedence in startAction below.
+  const minId = $('input#minId').value.trim();
+  const maxId = $('input#maxId').value.trim();
+  const minDate = $('input#minDate').value.trim();
+  const maxDate = $('input#maxDate').value.trim();
+
+  if (minId && !/^\d+$/.test(minId)) return log.error(`"After message ID" must be a numeric Discord ID, got: "${minId}"`);
+  if (maxId && !/^\d+$/.test(maxId)) return log.error(`"Before message ID" must be a numeric Discord ID, got: "${maxId}"`);
+  if (minId && maxId && BigInt(minId) >= BigInt(maxId)) {
+    return log.error('"After message ID" must be older (smaller snowflake) than "Before message ID".');
+  }
+
+  let minMs = -Infinity, maxMs = Infinity;
+  if (minId) minMs = snowflakeToMs(minId);
+  else if (minDate) {
+    const t = new Date(minDate).getTime();
+    if (Number.isNaN(t)) return log.error('Invalid "After date" — please re-enter using the date picker.');
+    minMs = t;
+  }
+  if (maxId) maxMs = snowflakeToMs(maxId);
+  else if (maxDate) {
+    const t = new Date(maxDate).getTime();
+    if (Number.isNaN(t)) return log.error('Invalid "Before date" — please re-enter using the date picker.');
+    maxMs = t;
+  }
+  if (minMs >= maxMs) return log.error('Date / message-interval bounds invert — After is at or after Before. Adjust or click "All".');
+
+  const filtered = importedSet.messages.filter(m => {
+    const ts = new Date(m.timestamp).getTime();
+    return Number.isFinite(ts) && ts >= minMs && ts <= maxMs;
+  });
+
+  if (filtered.length === 0) {
+    return log.error(`Filters left zero messages from the import (had ${importedSet.messages.length}). Adjust Date or Messages interval, or click "All".`);
+  }
+
+  const authToken = fillToken();
+  if (!authToken) return; // fillToken already logs an error.
+
+  const deleteDelay = getDelayMs('deleteDelay');
+  const streamerMode = $('input#streamerMode').checked;
+
+  ui.logArea.innerHTML = '';
+
+  undiscordCore.resetState();
+  // Reset every search-mode field on options so nothing leaks across modes,
+  // then plug in the import source. searchDelay isn't consulted in import mode
+  // but is set to 0 defensively in case downstream code reads it.
+  undiscordCore.options = {
+    ...undiscordCore.options,
+    authToken,
+    importSource: new ImportSource(filtered),
+    authorId: '',
+    guildId: '',
+    channelId: '',
+    minId: '',
+    maxId: '',
+    content: '',
+    hasLink: false, hasImage: false, hasVideo: false, hasSound: false,
+    hasSticker: false, hasPoll: false, hasEmbed: false, hasForward: false,
+    mentions: '',
+    mentionEveryone: false,
+    pinnedMode: 'include',  // export records have no pin metadata; "include" is the no-op
+    excludeContent: '',
+    excludeLink: false, excludeImage: false, excludeVideo: false, excludeSound: false,
+    excludeSticker: false, excludePoll: false, excludeEmbed: false, excludeForward: false,
+    excludeMentions: '',
+    excludeMentionEveryone: false,
+    searchDelay: 0,
+    deleteDelay,
+    streamerMode,
+  };
+
+  const skipped = importedSet.messages.length - filtered.length;
+  log.info(`Import-mode run: ${filtered.length.toLocaleString()} messages queued${skipped ? ` (${skipped.toLocaleString()} skipped by Date / Messages interval)` : ''}.`);
+
+  try { await undiscordCore.run(); }
+  catch (err) { log.error('CoreException', err); undiscordCore.stop(); }
+  finally {
+    // Drop the source reference so a subsequent search-mode run starts clean.
+    undiscordCore.options.importSource = null;
+  }
+}
+
 // Click handler for the ▶︎ Delete button. Reads every form input, captures the
 // auth token, parses the queue, expands jobs across (target × author), runs a
 // pre-flight permission check, and dispatches to undiscordCore.run() (single
 // target+author) or undiscordCore.runBatch() (multiple jobs).
+//
+// Routes to startImportAction() when an export has been imported.
 async function startAction() {
+  if (importedSet) return startImportAction();
   // general
   const authorId = $('input#authorId').value.trim();
   // filter — include
@@ -1462,6 +1640,7 @@ async function startAction() {
     ...undiscordCore.options,
     authToken,
     authorId,
+    importSource: null, // defensive — make sure a stale import source from a prior run doesn't leak in
     minId: minId || minDateUsed,
     maxId: maxId || maxDateUsed,
     content,

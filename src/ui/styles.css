@@ -1,43 +1,49 @@
 /* ----------------------------------------------------------------
- * Dark-mode fallback palette.
- * Each --_u-* var resolves to Discord's CSS variable when present,
- * and to a hand-picked dark color when Discord renames or removes it.
+ * Hardcoded palette — pinned values, NOT Discord theme variables.
+ * Reading Discord's --background-* / --text-* / etc. used to make the
+ * panel "match" the user's theme, but custom themes (BetterDiscord,
+ * Vencord, etc.) routinely override those vars to wildly different
+ * colors and broke the panel's look. Now: a self-contained dark
+ * palette that ignores whatever theme Discord is running.
+ *
+ * Centralized at the top so the whole color scheme can be retuned in
+ * one place without touching individual rules.
  * ---------------------------------------------------------------- */
 #undiscord {
-  --_u-bg-panel:        var(--background-secondary, #2b2d31);
-  --_u-bg-header:       var(--background-tertiary, #1e1f22);
-  --_u-bg-sidebar:      var(--bg-overlay-4, var(--background-base-lowest, #1e1f22));
-  --_u-bg-main:         var(--bg-overlay-chat, var(--background-base-lower, #313338));
-  --_u-bg-toolbar:      var(--bg-overlay-2, var(--__header-bar-background, #2b2d31));
-  --_u-bg-input:        var(--input-background, #1e1f22);
-  --_u-bg-floating:     var(--background-floating, #111214);
-  --_u-bg-hover:        var(--background-modifier-hover, #35373c);
-  --_u-bg-accent:       var(--background-modifier-accent, #3f4147);
-  --_u-bg-surface-high: var(--background-surface-high, #2b2d31);
+  --_u-bg-panel:        #2b2d31;
+  --_u-bg-header:       #1e1f22;
+  --_u-bg-sidebar:      #1e1f22;
+  --_u-bg-main:         #313338;
+  --_u-bg-toolbar:      #2b2d31;
+  --_u-bg-input:        #1e1f22;
+  --_u-bg-floating:     #111214;
+  --_u-bg-hover:        #35373c;
+  --_u-bg-accent:       #3f4147;
+  --_u-bg-surface-high: #2b2d31;
 
-  --_u-text:        var(--text-normal, var(--text-default, #dbdee1));
-  --_u-text-muted:  var(--text-muted, #949ba4);
-  --_u-text-header: var(--header-primary, #f2f3f5);
-  --_u-text-label:  var(--header-secondary, #b5bac1);
-  --_u-text-link:   var(--text-link, #00a8fc);
+  --_u-text:        #dbdee1;
+  --_u-text-muted:  #949ba4;
+  --_u-text-header: #f2f3f5;
+  --_u-text-label:  #b5bac1;
+  --_u-text-link:   #00a8fc;
 
-  --_u-int:        var(--interactive-normal, #b5bac1);
-  --_u-int-hover:  var(--interactive-hover, #dbdee1);
-  --_u-int-active: var(--interactive-active, #ffffff);
-  --_u-int-muted:  var(--interactive-muted, #6d6f78);
+  --_u-int:        #b5bac1;
+  --_u-int-hover:  #dbdee1;
+  --_u-int-active: #ffffff;
+  --_u-int-muted:  #6d6f78;
 
-  --_u-btn-secondary: var(--button-secondary-background, #4e5058);
-  --_u-btn-danger:    var(--button-danger-background, #da373c);
+  --_u-btn-secondary: #4e5058;
+  --_u-btn-danger:    #da373c;
 
-  --_u-border:       var(--border-subtle, rgba(78, 80, 88, 0.48));
-  --_u-input-border: var(--input-border, #1e1f22);
+  --_u-border:       rgba(78, 80, 88, 0.48);
+  --_u-input-border: #1e1f22;
 
-  --_u-scrollbar-thumb: var(--scrollbar-thin-thumb, rgba(24, 25, 28, 0.6));
-  --_u-scrollbar-track: var(--scrollbar-thin-track, transparent);
+  --_u-scrollbar-thumb: rgba(24, 25, 28, 0.6);
+  --_u-scrollbar-track: transparent;
 
-  --_u-shadow:        var(--elevation-high, 0 8px 16px rgba(0, 0, 0, 0.24));
-  --_u-shadow-stroke: var(--elevation-stroke, 0 0 0 1px rgba(0, 0, 0, 0.2));
-  --_u-font-display:  var(--font-display, 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif);
+  --_u-shadow:        0 8px 16px rgba(0, 0, 0, 0.24);
+  --_u-shadow-stroke: 0 0 0 1px rgba(0, 0, 0, 0.2);
+  --_u-font-display:  'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
 /* undiscord window */
@@ -319,7 +325,7 @@ body.undiscord-selecting * { cursor: crosshair !important; }
     background: none;
 }
 #undiscord #queueCounter .qc-orphan {
-    color: var(--_u-btn-danger, #da373c);
+    color: var(--_u-btn-danger);
 }
 
 #undiscord .input {
@@ -560,8 +566,8 @@ body.undiscord-selecting * { cursor: crosshair !important; }
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--background-floating, #18191c);
-    color: var(--interactive-normal);
+    background: #18191c;
+    color: #b5bac1;
     border-radius: 50%;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
     cursor: pointer;
@@ -569,13 +575,13 @@ body.undiscord-selecting * { cursor: crosshair !important; }
 }
 
 #undiscord-btn:hover {
-    color: var(--interactive-active);
-    background: var(--background-modifier-hover, #2e3035);
+    color: #ffffff;
+    background: #2e3035;
     transform: scale(1.05);
 }
 
 #undiscord-btn:focus-visible {
-    outline: 2px solid var(--brand-experiment, #5865f2);
+    outline: 2px solid #5865f2;
     outline-offset: 2px;
 }
 
@@ -589,7 +595,7 @@ body.undiscord-selecting * { cursor: crosshair !important; }
 }
 
 #undiscord-btn.running {
-    color: var(--button-danger-background) !important;
+    color: #da373c !important;
 }
 
 #undiscord-btn.running progress {
@@ -764,7 +770,7 @@ body.undiscord-selecting * { cursor: crosshair !important; }
   width: 30px;
   height: 30px;
   transform: rotate(-45deg);
-  background: repeating-linear-gradient(0, var(--_u-bg-accent, #3f4147), var(--_u-bg-accent, #3f4147) 1px, transparent 2px, transparent 4px);
+  background: repeating-linear-gradient(0, var(--_u-bg-accent), var(--_u-bg-accent) 1px, transparent 2px, transparent 4px);
   cursor: nwse-resize;
 }
 
@@ -788,8 +794,8 @@ body.undiscord-selecting * { cursor: crosshair !important; }
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: var(--background-floating, #1e1f22);
-  color: var(--interactive-normal, #b5bac1);
+  background-color: #1e1f22;
+  color: #b5bac1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -798,12 +804,12 @@ body.undiscord-selecting * { cursor: crosshair !important; }
 }
 #undiscord-server-btn:hover .udl-blob {
   border-radius: 16px;
-  background-color: var(--button-danger-background, #da373c);
+  background-color: #da373c;
   color: #ffffff;
 }
 #undiscord-server-btn.running .udl-blob {
   border-radius: 16px;
-  background-color: var(--button-danger-background, #da373c);
+  background-color: #da373c;
   color: #ffffff;
 }
 #undiscord-server-btn .udl-progress {
@@ -832,4 +838,60 @@ body.undiscord-selecting * { cursor: crosshair !important; }
 #undiscord-server-btn .udl-progress::-moz-progress-bar {
   background-color: #b8860b;
   border-radius: 2px;
+}
+
+/* ---------- Import mode ---------- */
+
+/* The "import mode" pill in the toolbar. Hidden by default; shown only when
+   undiscord-ui.js toggles its display. Discord-blurple to read as a status
+   indicator, not a button — no hover state. */
+#undiscord #importBadge.import-badge {
+  background: #5865f2;
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-left: 12px;
+  margin-bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+  font-family: var(--_u-font-display);
+}
+
+/* When an import is loaded, the General queue + Search/Delete filter sections
+   are not consulted at run time. Grey their fieldsets and disable interaction
+   so the user can see at a glance which inputs apply. The <summary> stays
+   clickable so sections can still be collapsed/expanded for inspection. */
+#undiscord.import-mode #sectionGeneral > fieldset,
+#undiscord.import-mode #sectionGeneral > #queueCounter,
+#undiscord.import-mode #sectionSearchFilter > fieldset,
+#undiscord.import-mode #sectionDeleteFilter > fieldset {
+  opacity: 0.4;
+  pointer-events: none;
+  filter: grayscale(0.4);
+}
+
+/* The Import section's own summary line gets a subtle accent so the user can
+   spot it quickly when scrolling the sidebar. */
+#undiscord #sectionImport > summary {
+  color: var(--_u-text-link);
+}
+#undiscord.import-mode #sectionImport > summary {
+  font-weight: 600;
+}
+
+/* Summary line under the file picker — a one-liner that fills in once parsing
+   finishes. Wraps because long timestamp ranges otherwise overflow the sidebar. */
+#undiscord #importSummary {
+  font-size: 11px;
+  color: var(--_u-text-muted);
+  word-break: break-word;
+  line-height: 1.4;
+}
+#undiscord.import-mode #importSummary {
+  color: var(--_u-text);
 }

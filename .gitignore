@@ -14,3 +14,9 @@ package-lock.json
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Discord data exports — never commit these (they contain every DM you've ever had)
+package/
+messages/
+export/
+*.zip
