@@ -11,17 +11,28 @@ const API_BASE = 'https://discord.com/api/v9';
 const MAX_DELETE_ATTEMPTS = 2;     // Per-message retry on transient failures.
 const MAX_TRANSIENT_RETRIES = 3;   // Search-side retries for 5xx and network errors.
 
+// Human-readable labels for state.endReason — used in the failure-summary line
+// (the `else` branch in run()'s end-summary). 'completed' and 'no-matches' have
+// their own dedicated branches, so they're intentionally not in this map.
+const END_REASON_LABELS = {
+  'empty-page-exhausted': 'Empty-page retry budget exhausted',
+  'user-stopped': 'User cancelled',
+  'user-declined': 'User declined the confirmation prompt',
+  'auth-expired': 'Auth token expired',
+  'fetch-error': 'Network or server error',
+  'api-error': 'API rejected the request',
+};
+
 class UndiscordCore {
 
   // ---- Private state ----
-  // #runId is bumped on every stop() and at the start of every run(); each
-  // loop captures the value at start and bails out if it ever sees a different
-  // value (the loop has been superseded by stop or a fresh run).
+  // run() bumps #runId on entry; each loop captures the value at start and bails
+  // out if it ever differs — meaning a fresh run() has superseded this loop.
   #runId = 0;
   #waitAbort = null; // set while a #wait() is in flight; calling it resolves the wait early
   #beforeTs = 0;     // timestamp at request-send, used by afterRequest() for ping calc
 
-  /** Cancellable sleep — stop() resolves this immediately so the loop checks running/runId without delay. */
+  /** Cancellable sleep — stop() resolves this immediately so the loop checks state.running without delay. */
   #wait(ms) {
     return new Promise((resolve) => {
       const t = setTimeout(() => {
@@ -38,21 +49,41 @@ class UndiscordCore {
 
   // ---- Public configuration / state ----
   options = {
-    authToken: null, // Your authorization token
-    authorId: null, // Author of the messages you want to delete
-    guildId: null, // Server where the messages are located
-    channelId: null, // Channel where the messages are located
-    minId: null, // Only delete messages after this, leave blank to delete all
-    maxId: null, // Only delete messages before this, leave blank to delete all
-    content: null, // Filter messages that contains this text content
-    hasLink: null, // Filter messages that contains link
-    hasFile: null, // Filter messages that contains file
-    includeNsfw: null, // Search in NSFW channels
-    includePinned: null, // Delete messages that are pinned
-    searchDelay: null, // Delay each time we fetch for more messages
-    deleteDelay: null, // Delay between each delete operation
-    maxEmptyPageRetries: 5, // Re-fetch this many times when an empty page comes back but grandTotal says more remain
+    authToken: null,
+    authorId: null,
+    guildId: null,
+    channelId: null,
+    minId: null,
+    maxId: null,
+    content: null,
+    hasLink: null,    // server-side: has an auto-embedded link preview
+    hasImage: null,   // server-side: has image attachment
+    hasVideo: null,   // server-side: has video attachment
+    hasSound: null,   // server-side: has audio attachment
+    hasSticker: null, // server-side: has sticker
+    hasPoll: null,    // server-side: has a poll
+    hasEmbed: null,   // server-side: has any embed (broader than link — includes manual embeds)
+    hasForward: null, // server-side: has a forwarded message snapshot
+    mentions: null,         // server-side: filter to messages @mentioning this user ID
+    mentionEveryone: null,  // server-side: filter to messages with @everyone / @here
+    pinnedMode: 'exclude',  // 'exclude' | 'include' | 'only' — server-side pinned filter
+    excludeContent: null, // post-search filter: drop messages containing this text
+    excludeMatchMode: 'substring', // 'substring' (term appears anywhere) | 'exact' (term appears as a standalone word)
+    excludeLink: null,    // post-search filter: drop messages with auto-link previews or URLs in content
+    excludeImage: null,   // post-search filter: drop messages with image attachments
+    excludeVideo: null,   // post-search filter: drop messages with video attachments
+    excludeSound: null,   // post-search filter: drop messages with audio attachments
+    excludeSticker: null, // post-search filter: drop messages with stickers
+    excludePoll: null,    // post-search filter: drop messages with polls
+    excludeEmbed: null,   // post-search filter: drop messages with any embed
+    excludeForward: null, // post-search filter: drop forwarded messages
+    excludeMentions: null,        // post-search filter: drop messages @mentioning ANY of these user IDs (comma-separated)
+    excludeMentionEveryone: null, // post-search filter: drop messages with @everyone / @here
+    searchDelay: null,
+    deleteDelay: null,
+    maxEmptyPageRetries: 5, // re-fetch this many times when grandTotal says more remain but the page is empty
     askForConfirmation: true,
+    streamerMode: false, // redact message content in the confirmation preview and per-delete log
   };
 
   state = {
@@ -62,6 +93,7 @@ class UndiscordCore {
     grandTotal: 0,
     offset: 0,
     emptyPageRetry: 0,
+    endReason: null, // 'completed' | 'empty-page-exhausted' | 'user-stopped' | 'user-declined' | 'auth-expired' | 'fetch-error' | 'api-error'
     _userDeleteDelay: 0, // baseline the user chose; options.deleteDelay decays back toward this after 429 bumps
     _userSearchDelay: 0, // baseline the user chose; options.searchDelay decays back toward this after 429 bumps
 
@@ -71,11 +103,13 @@ class UndiscordCore {
   };
 
   stats = {
-    startTime: null, // set by run() at start; only read after onProgress fires
-    throttledCount: 0, // how many times you have been throttled
-    throttledTotalTime: 0, // the total amount of time you spent being throttled
-    lastPing: null, // the most recent ping
-    avgPing: null, // average ping used to calculate the estimated remaining time
+    startTime: null,
+    throttledCount: 0,
+    throttledTotalTime: 0,
+    lastPing: null,    // most recent request round-trip; status display only
+    avgPing: null,     // EMA of lastPing; status display only
+    avgPostsInPage: 0, // running mean of deletable posts per page; drives ETR
+    pagesProcessed: 0, // count of productive pages observed (for the running mean)
     etr: 0,
   };
 
@@ -92,6 +126,7 @@ class UndiscordCore {
       grandTotal: 0,
       offset: 0,
       emptyPageRetry: 0,
+      endReason: null,
       _userDeleteDelay: 0,
       _userSearchDelay: 0,
 
@@ -103,7 +138,8 @@ class UndiscordCore {
     this.options.askForConfirmation = true;
   }
 
-  /** Automate the deletion process of multiple channels */
+  // Batch wrapper. Calls run() once per queued (server, channel) target, sequentially.
+  // The confirmation prompt only fires on the first job; subsequent jobs proceed silently.
   async runBatch(queue) {
     if (this.state.running) return log.error('Already running!');
 
@@ -112,11 +148,7 @@ class UndiscordCore {
       const job = queue[i];
       log.info('Starting job...', `(${i + 1}/${queue.length})`);
 
-      // set options
-      this.options = {
-        ...this.options, // keep current options
-        ...job, // override with options for that job
-      };
+      this.options = { ...this.options, ...job };
 
       await this.run(true);
       if (!this.state.running) break;
@@ -124,14 +156,15 @@ class UndiscordCore {
       log.info('Job ended.', `(${i + 1}/${queue.length})`);
       this.resetState();
       this.options.askForConfirmation = false;
-      // Note: run() sets state.running = true on entry, so we don't need to here.
     }
 
     log.info('Batch finished.');
     this.state.running = false;
   }
 
-  /** Start the deletion process */
+  // Main delete loop for a single (server, channel) target. Repeats:
+  // search → filter → confirm (first page only) → delete page → wait,
+  // until the search returns empty or stop() fires.
   async run(inBatch = false) {
     if (this.state.running && !inBatch) return log.error('Already running!');
 
@@ -141,69 +174,69 @@ class UndiscordCore {
     this.state._userDeleteDelay = this.options.deleteDelay; // baseline for decay after rate-limit bumps
     this.state._userSearchDelay = this.options.searchDelay;
     this.stats.startTime = new Date();
+    // Fresh running mean for the new run — page sizes vary by channel/content.
+    this.stats.avgPostsInPage = 0;
+    this.stats.pagesProcessed = 0;
 
     log.success(`\nStarted at ${this.stats.startTime.toLocaleString()}`);
-    log.debug(
-      `authorId = "${escapeHTML(this.options.authorId)}"`,
-      `guildId = "${escapeHTML(this.options.guildId)}"`,
-      `channelId = "${escapeHTML(this.options.channelId)}"`,
-      `minId = "${escapeHTML(this.options.minId)}"`,
-      `maxId = "${escapeHTML(this.options.maxId)}"`,
-      `hasLink = ${!!this.options.hasLink}`,
-      `hasFile = ${!!this.options.hasFile}`,
-    );
 
     if (this.onStart) this.onStart(this.state, this.stats);
 
     do {
-      // Bail out if a newer run() (or stop()) has superseded this loop.
+      // Bail out if a newer run() has superseded this loop.
       if (this.#runId !== myRunId) {
         log.verb('Run instance superseded — exiting old loop.');
         return;
       }
 
       log.verb('Fetching messages...');
-      // Search messages
       await this.search();
 
-      // search() can short-circuit on stop during a 202/429 cooldown wait,
-      // returning before _searchResponse is populated. filterResponse would crash.
+      // search() can short-circuit on stop during a 202/429 cooldown, returning
+      // before _searchResponse is populated. Bail out cleanly in that case.
       if (!this.state.running || this.#runId !== myRunId) return;
 
-      // Process results and find which messages should be deleted
       await this.filterResponse();
 
-      log.verb(
-        `Grand total: ${this.state.grandTotal}`,
-        `(Messages in current page: ${this.state._searchResponse.messages.length}`,
-        `To be deleted: ${this.state._messagesToDelete.length}`,
-        `Skipped: ${this.state._skippedMessages.length})`,
-        `offset: ${this.state.offset}`
-      );
+      log.verb(`Grand total: ${this.state.grandTotal}`);
+      log.verb(`Messages in current page: ${this.state._searchResponse.messages.length}`);
+      log.verb(`To be deleted: ${this.state._messagesToDelete.length}`);
+      log.verb(`Skipped: ${this.state._skippedMessages.length}`);
+      log.verb(`offset: ${this.state.offset}`);
       this.printStats();
 
-      // Calculate estimated time
       this.calcEtr();
       log.verb(`Estimated time remaining: ${msToHMS(this.stats.etr)}`);
 
-      // if there are messages to delete, delete them
       if (this.state._messagesToDelete.length > 0) {
         this.state.emptyPageRetry = 0; // got a productive page, reset retry counter
 
         if (await this.promptConfirmation() === false) {
-          this.state.running = false; // break out of a job
-          break; // immediately stop this iteration
+          this.state.endReason = 'user-declined';
+          this.state.running = false;
+          break;
         }
 
         await this.deleteMessagesFromList();
+        // If user clicked Stop during the delete loop, exit before the trailing search delay.
+        if (!this.state.running) break;
+
+        // Last-page short-circuit: if we've handled everything Discord said exists,
+        // skip the trailing wait + redundant empty-page confirmation search.
+        // (Page size isn't a reliable signal — Discord pages are content-bounded,
+        // so a sub-25 response can happen mid-run on long messages.)
+        if (this.state.delCount + this.state.failCount >= this.state.grandTotal) {
+          this.state.endReason = 'completed';
+          break;
+        }
       }
       else if (this.state._skippedMessages.length > 0) {
         this.state.emptyPageRetry = 0; // got a non-empty page, reset retry counter
-        // There's stuff on this page, but nothing we can delete (e.g. a page full of system messages).
-        // Check next page until we see a page with nothing in it (end of results).
+        // The page has results but no deletable ones (e.g. all system messages).
+        // Advance the offset and check the next page; loop ends when a fully empty page returns.
         const oldOffset = this.state.offset;
         this.state.offset += this.state._skippedMessages.length;
-        log.verb('There\'s nothing we can delete on this page, checking next page...');
+        log.verb('Nothing deletable on this page, checking next page...');
         log.verb(`Skipped ${this.state._skippedMessages.length} out of ${this.state._searchResponse.messages.length} in this page.`, `(Offset was ${oldOffset}, adjusted to ${this.state.offset})`);
       }
       else {
@@ -220,15 +253,19 @@ class UndiscordCore {
           // fall through to the trailing searchDelay wait, then loop iterates
         }
         else {
-          if (this.state.emptyPageRetry >= max) {
+          if (this.state.delCount + this.state.failCount === 0 && this.state.grandTotal === 0) {
+            // First search returned zero — the filters didn't match anything in this target.
+            // Distinct from a successful run; surface it as its own end state.
+            this.state.endReason = 'no-matches';
+          } else if (this.state.emptyPageRetry >= max) {
             log.warn(`Gave up after ${max} consecutive empty pages.`, `(${expectedRemaining} message(s) still expected per grandTotal — may be unreachable due to search index lag, offset cap, or filter mismatch.)`);
+            this.state.endReason = 'empty-page-exhausted';
           } else {
-            log.verb('Ended because API returned an empty page.');
+            this.state.endReason = 'completed';
           }
-          log.verb('[End state]', this.state);
           if (inBatch) break; // break without stopping if this is part of a job
           this.state.running = false;
-          break; // skip the trailing searchDelay wait — we're done
+          break; // skip the trailing searchDelay wait — done
         }
       }
 
@@ -238,36 +275,80 @@ class UndiscordCore {
 
     } while (this.state.running);
 
-    // If this loop was superseded while waiting, suppress the "Ended" summary
-    // and the onStop callback — those belong to the new run, not this one.
+    // If a fresh run() bumped #runId while this loop was waiting, the end-summary
+    // and onStop belong to that new run — skip them here. Manual stop() does not
+    // bump #runId, so a user-triggered stop falls through to the summary below.
     if (this.#runId !== myRunId) return;
 
     const endTime = new Date();
-    log.success(`Ended at ${endTime.toLocaleString()}! Total time: ${msToHMS(endTime.getTime() - this.stats.startTime.getTime())}`);
+    const elapsed = msToHMS(endTime.getTime() - this.stats.startTime.getTime());
+
+    // Pick the end-summary log level/format from how the run ended. Each line gets
+    // its own log call so they stack vertically (and inherit the level's color).
+    if (this.state.endReason === 'no-matches') {
+      log.warn('No matching messages found.');
+      log.warn('The search filter returned zero results — no messages match the current parameters.');
+      log.warn(`Total time elapsed: ${elapsed}`);
+    } else if (this.state.endReason === 'completed' && this.state.failCount === 0) {
+      log.success('Run completed successfully.');
+      log.success(`All messages deleted: ${this.state.delCount}/${this.state.grandTotal}`);
+      log.success(`Total time elapsed: ${elapsed}`);
+    } else if (this.state.endReason === 'completed') {
+      log.warn('Run completed with failures.');
+      log.warn(`Deleted: ${this.state.delCount}/${this.state.grandTotal}`);
+      log.warn(`Failure count: ${this.state.failCount}`);
+      log.warn(`Total time elapsed: ${elapsed}`);
+    } else {
+      const mode = END_REASON_LABELS[this.state.endReason] || 'Unknown';
+      log.error('Run failed early.');
+      log.error(`Failure mode: ${mode}`);
+      log.error(`Deleted: ${this.state.delCount}/${this.state.grandTotal}`);
+      log.error(`Total time elapsed: ${elapsed}`);
+    }
     this.printStats();
-    log.debug(`Deleted ${this.state.delCount} messages, ${this.state.failCount} failed.\n`);
 
     if (this.onStop) this.onStop(this.state, this.stats);
   }
 
+  // Aborts the run. Sets state.running=false and wakes any in-flight sleep so the
+  // main loop exits at its next checkpoint and prints the end-summary.
   stop() {
+    if (this.state.running) this.state.endReason = 'user-stopped';
     this.state.running = false;
-    this.#runId++;                          // invalidate any in-flight loop
-    if (this.#waitAbort) this.#waitAbort(); // wake up the loop's sleep so it exits immediately
+    if (this.#waitAbort) this.#waitAbort();
     if (this.onStop) this.onStop(this.state, this.stats);
   }
 
-  /** Calculate the estimated time remaining based on the current stats */
+  // Estimated time remaining = perPostCost × remaining, where perPostCost is
+  // derived from observed page sizes:
+  //   perPageCost = searchDelay + (avgPostsInPage * deleteDelay)
+  //   perPostCost = perPageCost / avgPostsInPage
+  // Uses an avgN of 25 as a starting estimate before any productive page has been
+  // observed (Discord's pages are content-bounded so real values often fall lower);
+  // the running mean converges within a handful of pages.
+  // (Ping is intentionally out of this formula — its variance dwarfs deleteDelay
+  // on stable connections, and rate-limit bumps are reflected via options.deleteDelay
+  // already, so adding ping double-counts during throttle.)
   calcEtr() {
-    this.stats.etr = (this.options.searchDelay * Math.round(this.state.grandTotal / 25)) + ((this.options.deleteDelay + this.stats.avgPing) * this.state.grandTotal);
+    const remaining = this.state.grandTotal - this.state.delCount - this.state.failCount;
+    if (remaining <= 0) { this.stats.etr = 0; return; }
+    const avgN = this.stats.avgPostsInPage > 0 ? this.stats.avgPostsInPage : 25;
+    const perPageCost = this.options.searchDelay + (avgN * this.options.deleteDelay);
+    this.stats.etr = (perPageCost / avgN) * remaining;
   }
 
-  /** Show a window.confirm dialog with a preview of the messages about to be deleted. */
+  // Shows a browser confirm() dialog with the estimated count, ETA, and a content
+  // preview. Fires once per run (or once per batch); subsequent pages skip the prompt.
   async promptConfirmation() {
     if (!this.options.askForConfirmation) return true;
 
     log.verb('Waiting for your confirmation...');
-    const preview = this.state._messagesToDelete.map(m => `${m.author?.username ?? '[system]'}#${m.author?.discriminator ?? '0'}: ${m.attachments?.length ? '[ATTACHMENTS]' : m.content}`).join('\n');
+    const sm = this.options.streamerMode;
+    const preview = this.state._messagesToDelete.map(m => {
+      const author = sm ? '••••' : `${m.author?.username ?? '[system]'}#${m.author?.discriminator ?? '0'}`;
+      const body = m.attachments?.length ? '[ATTACHMENTS]' : (sm ? '••••' : m.content);
+      return `${author}: ${body}`;
+    }).join('\n');
 
     const answer = await askYesNo(
       `Do you want to delete ~${this.state.grandTotal} messages? (Estimated time: ${msToHMS(this.stats.etr)})` +
@@ -287,6 +368,9 @@ class UndiscordCore {
     }
   }
 
+  // Fetches the next page of matching messages from Discord's search API.
+  // Handles 202 (channel not yet indexed), 429 (rate limit, with delay bump),
+  // 401 (auth expired), 5xx (transient retry), and network errors.
   async search(transientAttempt = 0) {
     const base = this.options.guildId === '@me'
       ? `${API_BASE}/channels/${this.options.channelId}/messages/`  // DMs
@@ -304,10 +388,24 @@ class UndiscordCore {
         ['sort_by', 'timestamp'],
         ['sort_order', 'desc'],
         ['offset', this.state.offset],
-        ['has', this.options.hasLink ? 'link' : undefined],
-        ['has', this.options.hasFile ? 'file' : undefined],
+        ['has', this.options.hasLink    ? 'link'     : undefined],
+        ['has', this.options.hasImage   ? 'image'    : undefined],
+        ['has', this.options.hasVideo   ? 'video'    : undefined],
+        ['has', this.options.hasSound   ? 'sound'    : undefined],
+        ['has', this.options.hasSticker ? 'sticker'  : undefined],
+        ['has', this.options.hasPoll    ? 'poll'     : undefined],
+        ['has', this.options.hasEmbed   ? 'embed'    : undefined],
+        ['has', this.options.hasForward ? 'snapshot' : undefined],
+        ['mentions',         this.options.mentions || undefined],
+        ['mention_everyone', this.options.mentionEveryone ? true : undefined],
+        ['pinned',
+          this.options.pinnedMode === 'only'    ? true  :
+          this.options.pinnedMode === 'exclude' ? false : undefined],
         ['content', this.options.content || undefined],
-        ['include_nsfw', this.options.includeNsfw ? true : undefined],
+        // Always include NSFW channels — the flag is permissive (whitelists NSFW results),
+        // not restrictive, so SFW channels return normally either way. Omitting it would
+        // silently zero-result any age-gated channel in the queue.
+        ['include_nsfw', true],
       ]), {
         headers: { 'Authorization': this.options.authToken }
       });
@@ -321,6 +419,7 @@ class UndiscordCore {
         if (!this.state.running) return;
         return await this.search(transientAttempt + 1);
       }
+      this.state.endReason = 'fetch-error';
       this.state.running = false;
       log.error(`Search request failed ${MAX_TRANSIENT_RETRIES + 1} times:`, err);
       throw err;
@@ -359,6 +458,7 @@ class UndiscordCore {
 
       // 401: token expired or invalid — clearer message, no retry.
       if (resp.status === 401) {
+        this.state.endReason = 'auth-expired';
         this.state.running = false;
         log.error('Your Discord session expired or the token is invalid. Reload Discord and try again.');
         throw resp;
@@ -374,6 +474,7 @@ class UndiscordCore {
       }
 
       // Anything else: hard error.
+      this.state.endReason = (resp.status >= 500) ? 'fetch-error' : 'api-error';
       this.state.running = false;
       log.error(`Error searching messages, API responded with status ${resp.status}!\n`, await resp.json());
       throw resp;
@@ -392,29 +493,114 @@ class UndiscordCore {
     return data;
   }
 
+  // Narrows the latest search response down to the messages this script will
+  // actually delete: drops system messages and (by default) pinned messages.
+  // Records the rest as "skipped" so the caller can advance the search offset past them.
   async filterResponse() {
     const data = this.state._searchResponse;
 
-    // the search total will decrease as we delete stuff
+    // grandTotal locks in the highest total_results ever seen and only ever grows.
+    // The per-search total_results shrinks as deletes succeed, but we keep the peak
+    // so the post-loop "deleted N/M" denominator reflects the original target size.
     const total = data.total_results;
     if (total > this.state.grandTotal) this.state.grandTotal = total;
 
-    // search returns messages near the actual message, only get the messages we searched for.
-    // .filter(Boolean) drops convos with no hit (defensive — Discord normally guarantees a hit per convo).
+    // search returns conversation context (messages near the matched one); only the message
+    // marked hit:true is the actual match. .filter(Boolean) drops any convo missing a hit
+    // (defensive — Discord normally guarantees a hit per convo).
     const discoveredMessages = data.messages.map(convo => convo.find(message => message.hit === true)).filter(Boolean);
 
-    // we can only delete some types of messages, system messages are not deletable.
+    // Type 0 = regular user message; types 6-21 cover pins, joins, replies, etc.
+    // System messages outside that range cannot be deleted via this endpoint.
     let messagesToDelete = discoveredMessages;
     messagesToDelete = messagesToDelete.filter(msg => msg.type === 0 || (msg.type >= 6 && msg.type <= 21));
-    messagesToDelete = messagesToDelete.filter(msg => msg.pinned ? this.options.includePinned : true);
 
-    // create an array containing everything we skipped. (used to calculate offset for next searches)
+    // Pinned mode is enforced server-side via the `pinned` query param. Re-filter
+    // here as a safety net in case Discord ever returns a stray non-matching message.
+    if (this.options.pinnedMode === 'exclude') {
+      messagesToDelete = messagesToDelete.filter(msg => !msg.pinned);
+    } else if (this.options.pinnedMode === 'only') {
+      messagesToDelete = messagesToDelete.filter(msg => msg.pinned);
+    }
+
+    // Exclude filters — Discord's search API has no "doesn't have" parameter, so
+    // these run client-side after the search response comes back. Each one drops
+    // messages that match the corresponding has-type, mirroring the Include grid.
+    const opt = this.options;
+    if (opt.excludeContent) {
+      const term = opt.excludeContent.toLowerCase();
+      if (opt.excludeMatchMode === 'exact') {
+        // Word-boundary match: term must appear as a standalone word in the message.
+        // "cat" skips "I love my cat." but NOT "I love cats". Term is regex-escaped
+        // so special chars (.+*?[](){} etc.) match literally.
+        const escaped = opt.excludeContent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp(`\\b${escaped}\\b`, 'i');
+        messagesToDelete = messagesToDelete.filter(msg => !re.test(msg.content || ''));
+      } else {
+        messagesToDelete = messagesToDelete.filter(msg => !(msg.content || '').toLowerCase().includes(term));
+      }
+    }
+    if (opt.excludeLink) {
+      messagesToDelete = messagesToDelete.filter(msg =>
+        !(msg.embeds?.some(e => e.type === 'link' || e.type === 'article')) &&
+        !/https?:\/\//i.test(msg.content || ''));
+    }
+    if (opt.excludeImage) {
+      messagesToDelete = messagesToDelete.filter(msg =>
+        !(msg.attachments?.some(a => a.content_type?.startsWith('image/'))));
+    }
+    if (opt.excludeVideo) {
+      messagesToDelete = messagesToDelete.filter(msg =>
+        !(msg.attachments?.some(a => a.content_type?.startsWith('video/'))));
+    }
+    if (opt.excludeSound) {
+      messagesToDelete = messagesToDelete.filter(msg =>
+        !(msg.attachments?.some(a => a.content_type?.startsWith('audio/'))));
+    }
+    if (opt.excludeSticker) {
+      messagesToDelete = messagesToDelete.filter(msg =>
+        !(msg.sticker_items?.length > 0) && !(msg.stickers?.length > 0));
+    }
+    if (opt.excludePoll) {
+      messagesToDelete = messagesToDelete.filter(msg => !msg.poll);
+    }
+    if (opt.excludeEmbed) {
+      messagesToDelete = messagesToDelete.filter(msg => !(msg.embeds?.length > 0));
+    }
+    if (opt.excludeForward) {
+      messagesToDelete = messagesToDelete.filter(msg =>
+        !(msg.message_snapshots?.length > 0) && msg.message_reference?.type !== 1);
+    }
+    if (opt.excludeMentions) {
+      // Skip @user is a multi-value list — applied client-side, so any number of
+      // mentioned users can be skipped per run (the API limitation only affects
+      // Include @user, which is single-value at search time).
+      const skipIds = String(opt.excludeMentions).split(/\s*,\s*/).filter(Boolean);
+      if (skipIds.length) {
+        messagesToDelete = messagesToDelete.filter(msg =>
+          !(msg.mentions?.some(u => skipIds.includes(u.id))));
+      }
+    }
+    if (opt.excludeMentionEveryone) {
+      messagesToDelete = messagesToDelete.filter(msg => !msg.mention_everyone);
+    }
+
+    // Skipped messages still count toward the search offset for the next page.
     const skippedMessages = discoveredMessages.filter(msg => !messagesToDelete.find(m => m.id === msg.id));
 
     this.state._messagesToDelete = messagesToDelete;
     this.state._skippedMessages = skippedMessages;
+
+    // Feed the running mean of deletable posts per page — only on productive pages,
+    // since skipped-only pages don't follow the (search → N deletes) cost model.
+    if (messagesToDelete.length > 0) {
+      this.stats.pagesProcessed++;
+      this.stats.avgPostsInPage += (messagesToDelete.length - this.stats.avgPostsInPage) / this.stats.pagesProcessed;
+    }
   }
 
+  // Issues one DELETE per message in the current page, with per-message retry on
+  // transient failures and a deleteDelay sleep between each.
   async deleteMessagesFromList() {
     const myRunId = this.#runId;
     for (let i = 0; i < this.state._messagesToDelete.length; i++) {
@@ -423,17 +609,17 @@ class UndiscordCore {
 
       const message = this.state._messagesToDelete[i];
 
-      const author = `${message.author?.username ?? '[system]'}#${message.author?.discriminator ?? '0'}`;
+      const sm = this.options.streamerMode;
+      const author = sm ? '••••' : `${message.author?.username ?? '[system]'}#${message.author?.discriminator ?? '0'}`;
       log.debug(
         `[${this.state.delCount + 1}/${this.state.grandTotal}] ` +
         `<sup>${new Date(message.timestamp).toLocaleString()}</sup> ` +
         `<b>${escapeHTML(author)}</b>` +
-        `: <i>${escapeHTML(message.content ?? '').replace(/\n/g, '↵')}</i>` +
-        (message.attachments?.length ? escapeHTML(JSON.stringify(message.attachments)) : ''),
+        `: <i>${escapeHTML(sm ? '••••' : (message.content ?? '')).replace(/\n/g, '↵')}</i>` +
+        (message.attachments?.length ? (sm ? ' [ATTACHMENTS]' : escapeHTML(JSON.stringify(message.attachments))) : ''),
         `<sup>{ID:${escapeHTML(message.id)}}</sup>`
       );
 
-      // Delete a single message (with retry)
       let attempt = 0;
       while (attempt < MAX_DELETE_ATTEMPTS) {
         const result = await this.deleteMessage(message);
@@ -454,6 +640,9 @@ class UndiscordCore {
     }
   }
 
+  // Deletes a single message via DELETE /channels/<id>/messages/<id>.
+  // Returns 'OK' (deleted), 'RETRY' (transient — caller may try again),
+  // or 'FAILED' (permanent — counted toward failCount).
   async deleteMessage(message) {
     const API_DELETE_URL = `${API_BASE}/channels/${message.channel_id}/messages/${message.id}`;
     let resp;
@@ -486,6 +675,7 @@ class UndiscordCore {
         return 'RETRY';
       } else if (resp.status === 401) {
         // Token expired or invalid — abort the whole run, not just this message.
+        this.state.endReason = 'auth-expired';
         this.state.running = false;
         log.error('Your Discord session expired or the token is invalid. Reload Discord and try again.');
         this.state.failCount++;
@@ -542,14 +732,10 @@ class UndiscordCore {
   }
 
   printStats() {
-    log.verb(
-      `Delete delay: ${this.options.deleteDelay}ms, Search delay: ${this.options.searchDelay}ms`,
-      `Last Ping: ${this.stats.lastPing}ms, Average Ping: ${this.stats.avgPing | 0}ms`,
-    );
-    log.verb(
-      `Rate Limited: ${this.stats.throttledCount} times.`,
-      `Total time throttled: ${msToHMS(this.stats.throttledTotalTime)}.`
-    );
+    log.verb(`Delete delay: ${this.options.deleteDelay}ms, Search delay: ${this.options.searchDelay}ms`);
+    log.verb(`Last Ping: ${this.stats.lastPing}ms, Average Ping: ${this.stats.avgPing | 0}ms`);
+    log.verb(`Rate Limited: ${this.stats.throttledCount} times.`);
+    log.verb(`Total time throttled: ${msToHMS(this.stats.throttledTotalTime)}.`);
   }
 }
 

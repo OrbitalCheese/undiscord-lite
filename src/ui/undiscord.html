@@ -10,136 +10,229 @@
         <div class="vert-divider"></div>
         <span> Bulk delete messages</span>
         <div class="spacer"></div>
-        <div id="hide" class="icon" aria-label="Close" role="button" tabindex="0">
+        <div id="hide" class="icon" aria-label="Minimize" role="button" tabindex="0" title="Minimize (run continues in background)">
             <svg aria-hidden="false" width="24" height="24" viewBox="0 0 24 24">
-                <path fill="currentColor"
-                    d="M18.4 4L12 10.4L5.6 4L4 5.6L10.4 12L4 18.4L5.6 20L12 13.6L18.4 20L20 18.4L13.6 12L20 5.6L18.4 4Z">
-                </path>
+                <path fill="currentColor" d="M5 18h14v3H5z"></path>
             </svg>
         </div>
     </div>
     <div class="window-body" style="display: flex; flex-direction: row;">
         <div class="sidebar scroll">
             <details open>
-                <summary>General</summary>
+                <summary>General<button class="help-btn" data-help="tabGeneral" title="Show help for the General tab">Help</button></summary>
                 <fieldset>
                     <legend>Author ID</legend>
+                    <button class="help-btn" data-help="authorId" title="Show help for Author ID">Help</button>
                     <div class="input-wrapper">
-                        <input class="input" id="authorId" type="text">
+                        <input class="input clearable" id="authorId" type="text">
+                        <button class="clear-btn" id="clearAuthor" title="Clear Author ID">Clear</button>
                     </div>
                     <div class="input-actions">
-                        <button id="getAuthor">me</button>
+                        <button id="getAuthor">Me</button>
+                        <button id="selectAuthor" title="Click, then click a user or message in Discord to capture their User ID. Hold Shift to capture multiple in a row.">Select</button>
+                    </div>
+                    <div class="sectionDescription tips" style="margin-top: 4px;">
+                        <div>› TIP: Hold down Shift to select multiple things in a row!</div>
                     </div>
                 </fieldset>
                 <hr>
                 <fieldset>
                     <legend>Server ID</legend>
+                    <button class="help-btn" data-help="serverId" title="Show help for Server ID">Help</button>
                     <div class="input-wrapper">
-                        <input class="input" id="guildId" type="text">
+                        <input class="input clearable" id="guildId" type="text">
+                        <button class="clear-btn" id="clearGuild" title="Clear Server (also clears Channel)">Clear</button>
                     </div>
                     <div class="input-actions">
-                        <button id="setGuild">set</button>
-                        <button id="addGuild">add</button>
-                        <button id="delGuild">del</button>
+                        <button id="selectGuild" title="Click, then click a server icon in Discord to capture its ID">Select</button>
+                        <button id="addGuild">Add</button>
+                        <button id="delGuild">Delete</button>
                     </div>
                 </fieldset>
                 <fieldset>
                     <legend>Channel ID</legend>
+                    <button class="help-btn" data-help="channelId" title="Show help for Channel ID">Help</button>
                     <div class="input-wrapper">
-                        <input class="input" id="channelId" type="text">
+                        <input class="input clearable" id="channelId" type="text">
+                        <button class="clear-btn" id="clearChannel" title="Clear Channel only">Clear</button>
                     </div>
                     <div class="input-actions">
-                        <button id="setChannel">set</button>
-                        <button id="addChannel">add</button>
-                        <button id="delChannel">del</button>
+                        <button id="selectChannel" title="Click, then click a channel or message in Discord to capture its ID">Select</button>
+                        <button id="addChannel">Add</button>
+                        <button id="delChannel">Delete</button>
                     </div>
-                    <div id="queueCounter"></div>
+                </fieldset>
+                <fieldset>
+                    <legend>DMs</legend>
+                    <button class="help-btn" data-help="dms" title="Show help for DMs">Help</button>
+                    <div class="input-actions">
+                        <button id="addAllDms" title="Queue every DM channel currently open in your sidebar">Add DM's</button>
+                        <button id="delAllDms" title="Remove every queued DM channel from the queue">Clear DM's</button>
+                    </div>
+                    <div class="sectionDescription" style="margin-top: 3px;">
+                        <label class="row" style="margin-bottom: 0;" title="Toggle whether group DMs are included in the bulk add"><input id="includeGroupDms" type="checkbox"><span id="includeGroupDmsLabel">Skipping all group DM's</span></label>
+                    </div>
+                </fieldset>
+                <div id="queueCounter"></div>
+            </details>
+            <hr>
+            <details>
+                <summary>Search filter<button class="help-btn" data-help="tabSearchFilter" title="Show help for the Search filter tab">Help</button></summary>
+                <fieldset>
+                    <legend>Include text</legend>
+                    <button class="help-btn" data-help="includeText" title="Show help for Include text">Help</button>
+                    <div class="input-wrapper">
+                        <input class="clearable" id="search" type="text" placeholder="Containing text">
+                        <button class="clear-btn" id="clearSearch" title="Clear Include text">Clear</button>
+                    </div>
+                </fieldset>
+                <fieldset>
+                    <legend>Include attachment type</legend>
+                    <button class="help-btn" data-help="includeAttachment" title="Show help for Include attachment type">Help</button>
+                    <div class="has-grid">
+                        <label><input id="hasLink"    type="checkbox">Link</label>
+                        <label><input id="hasImage"   type="checkbox">Image</label>
+                        <label><input id="hasVideo"   type="checkbox">Video</label>
+                        <label><input id="hasSound"   type="checkbox">Sound</label>
+                        <label><input id="hasSticker" type="checkbox">Sticker</label>
+                        <label><input id="hasPoll"    type="checkbox">Poll</label>
+                        <label><input id="hasEmbed"   type="checkbox">Embed</label>
+                        <label><input id="hasForward" type="checkbox">Forward</label>
+                    </div>
+                    <div class="sectionDescription" style="margin-top: 8px;">
+                        <label class="row" style="margin-bottom: 0;">Pinned:&nbsp;
+                            <select id="pinnedMode">
+                                <option value="exclude" selected>exclude (skip)</option>
+                                <option value="include">include</option>
+                                <option value="only">only pinned</option>
+                            </select>
+                        </label>
+                    </div>
+                </fieldset>
+                <fieldset>
+                    <legend>Include @user</legend>
+                    <button class="help-btn" data-help="includeUser" title="Show help for Include @user">Help</button>
                     <div class="sectionDescription">
-                        <label class="row"><input id="includeNsfw" type="checkbox">This is a NSFW channel</label>
+                        <label><input id="mentionEveryone" type="checkbox">Include @everyone / @here</label>
                     </div>
-                    <div class="sectionDescription tips">
-                        <div>› Leave Channel ID's empty to target the entire server.</div>
-                        <div>› Use 'set' to override all with the current server/channel.</div>
-                        <div>› Use 'add' to add the current server/channel to a batch job.</div>
-                        <div>› Use 'del' to remove the current server/channel from the batch.</div>
+                    <div class="input-wrapper">
+                        <input class="clearable" id="mentionsId" type="text" placeholder="Mentions user ID">
+                        <button class="clear-btn" id="clearMentions" title="Clear Mentions user IDs">Clear</button>
+                    </div>
+                    <div class="input-actions">
+                        <button id="selectMentions" title="Click, then click a user or message in Discord to capture their User ID">Select</button>
                     </div>
                 </fieldset>
             </details>
             <hr>
             <details>
-                <summary>Filter</summary>
+                <summary>Delete filter<button class="help-btn" data-help="tabDeleteFilter" title="Show help for the Delete filter tab">Help</button></summary>
                 <fieldset>
-                    <legend>Search</legend>
+                    <legend>Skip text</legend>
+                    <button class="help-btn" data-help="excludeText" title="Show help for Skip text">Help</button>
                     <div class="input-wrapper">
-                        <input id="search" type="text" placeholder="Containing text">
+                        <input class="clearable" id="excludeSearch" type="text" placeholder="Skip messages containing">
+                        <button class="clear-btn" id="clearExcludeSearch" title="Clear Exclude text">Clear</button>
                     </div>
-                    <div class="sectionDescription">
-                        Only delete messages that contain the text
+                    <div class="sectionDescription" style="margin-top: 6px;">
+                        <label class="row" style="margin-bottom: 0;" title="Substring: term appears anywhere in the message. Exact: term must appear as a standalone word.">Match:&nbsp;
+                            <input id="excludeMatchPill" type="checkbox" checked>
+                            <span id="excludeMatchLabel">Substring</span>
+                        </label>
                     </div>
-                    <div class="sectionDescription">
-                        <label><input id="hasLink" type="checkbox">has: link</label>
+                </fieldset>
+                <fieldset>
+                    <legend>Skip attachment type</legend>
+                    <button class="help-btn" data-help="excludeAttachment" title="Show help for Skip attachment type">Help</button>
+                    <div class="has-grid">
+                        <label><input id="excludeLink"    type="checkbox">Link</label>
+                        <label><input id="excludeImage"   type="checkbox">Image</label>
+                        <label><input id="excludeVideo"   type="checkbox">Video</label>
+                        <label><input id="excludeSound"   type="checkbox">Sound</label>
+                        <label><input id="excludeSticker" type="checkbox">Sticker</label>
+                        <label><input id="excludePoll"    type="checkbox">Poll</label>
+                        <label><input id="excludeEmbed"   type="checkbox">Embed</label>
+                        <label><input id="excludeForward" type="checkbox">Forward</label>
                     </div>
+                </fieldset>
+                <fieldset>
+                    <legend>Skip @user</legend>
+                    <button class="help-btn" data-help="excludeUser" title="Show help for Skip @user">Help</button>
                     <div class="sectionDescription">
-                        <label><input id="hasFile" type="checkbox">has: file</label>
+                        <label><input id="excludeMentionEveryone" type="checkbox">skip @everyone / @here</label>
                     </div>
-                    <div class="sectionDescription">
-                        <label><input id="includePinned" type="checkbox">Include pinned</label>
+                    <div class="input-wrapper">
+                        <input class="clearable" id="excludeMentionsId" type="text" placeholder="Mentions user ID">
+                        <button class="clear-btn" id="clearExcludeMentions" title="Clear Exclude mentions user IDs">Clear</button>
+                    </div>
+                    <div class="input-actions">
+                        <button id="selectExcludeMentions" title="Click, then click a user or message in Discord to capture their User ID">Select</button>
                     </div>
                 </fieldset>
             </details>
+            <hr>
             <details>
-                <summary>Messages interval</summary>
+                <summary>Messages interval<button class="help-btn" data-help="tabMessagesInterval" title="Show help for the Messages interval tab">Help</button></summary>
                 <fieldset>
                     <legend>Interval of messages</legend>
-                    <div class="input-wrapper mb1">
-                        <input id="minId" type="text" placeholder="After a message ID">
+                    <button class="help-btn" data-help="messagesInterval" title="Show help for Messages interval">Help</button>
+                    <div class="input-wrapper">
+                        <input class="clearable" id="minId" type="text" placeholder="After a message ID">
+                        <button class="clear-btn" id="clearMinId" title="Clear After message ID">Clear</button>
+                    </div>
+                    <div class="input-actions" style="margin-bottom: 5px;">
+                        <button id="selectMinId" title="Click, then click a message in Discord to capture its ID as the After bound">Select</button>
                     </div>
                     <div class="input-wrapper">
-                        <input id="maxId" type="text" placeholder="Before a message ID">
+                        <input class="clearable" id="maxId" type="text" placeholder="Before a message ID">
+                        <button class="clear-btn" id="clearMaxId" title="Clear Before message ID">Clear</button>
                     </div>
-                    <div class="sectionDescription">
-                        Specify an interval to delete messages. Right-click a message in Discord → Copy Message ID.
+                    <div class="input-actions">
+                        <button id="selectMaxId" title="Click, then click a message in Discord to capture its ID as the Before bound">Select</button>
                     </div>
                 </fieldset>
             </details>
+            <hr>
             <details>
-                <summary>Date interval</summary>
+                <summary>Date interval<button class="help-btn" data-help="tabDateInterval" title="Show help for the Date interval tab">Help</button></summary>
                 <fieldset>
                     <legend>After date</legend>
+                    <button class="help-btn" data-help="dateInterval" title="Show help for Date interval">Help</button>
                     <div class="input-wrapper mb1">
-                        <input id="minDate" type="datetime-local" title="Messages posted AFTER this date">
+                        <input id="minDate" type="datetime-local" value="2015-01-01T00:00" title="Messages posted AFTER this date (defaults to Discord's launch — clear or change as needed)">
                     </div>
                     <legend>Before date</legend>
                     <div class="input-wrapper">
                         <input id="maxDate" type="datetime-local" title="Messages posted BEFORE this date">
                     </div>
-                    <div class="sectionDescription">
-                        Delete messages that were posted between the two dates.
-                    </div>
-                    <div class="sectionDescription">
-                        * Filtering by date doesn't work if you use the "Messages interval".
+                    <div class="input-actions">
+                        <button id="datePresetDay"  class="date-preset-day"  title="Now − 24 hours">1 Day</button>
+                        <button id="datePresetWeek" class="date-preset-week" title="Now − 7 days">1 Week</button>
+                        <button id="datePresetAll"  class="date-preset-all"  title="Reset After to 2015 and clear Before">All</button>
                     </div>
                 </fieldset>
             </details>
             <hr>
             <details>
-                <summary>Advanced settings</summary>
+                <summary>Advanced settings<button class="help-btn" data-help="tabAdvanced" title="Show help for the Advanced settings tab">Help</button></summary>
                 <fieldset>
-                    <legend>Search delay</legend>
-                    <div class="input-wrapper">
-                        <input id="searchDelay" type="range" value="30000" step="100" min="100" max="60000">
-                        <div id="searchDelayValue"></div>
+                    <legend>Search delay (ms)</legend>
+                    <button class="help-btn" data-help="searchDelay" title="Show help for Search delay">Help</button>
+                    <div class="stepper">
+                        <input id="searchDelay" type="text" title="Click to type a value (auto-clamps to 15000–60000 ms)">
+                        <button id="searchDelayDown" class="stepper-down" title="−500 ms">&lt;</button>
+                        <button id="searchDelayReset" class="stepper-reset" title="Reset to default">↺</button>
+                        <button id="searchDelayUp" class="stepper-up" title="+500 ms">&gt;</button>
                     </div>
                 </fieldset>
                 <fieldset>
-                    <legend>Delete delay</legend>
-                    <div class="input-wrapper">
-                        <input id="deleteDelay" type="range" value="1000" step="50" min="50" max="10000">
-                        <div id="deleteDelayValue"></div>
-                    </div>
-                    <br>
-                    <div class="sectionDescription">
-                        This will affect the speed in which the messages are deleted.
+                    <legend>Delete delay (ms)</legend>
+                    <button class="help-btn" data-help="deleteDelay" title="Show help for Delete delay">Help</button>
+                    <div class="stepper">
+                        <input id="deleteDelay" type="text" title="Click to type a value (auto-clamps to 100–3000 ms)">
+                        <button id="deleteDelayDown" class="stepper-down" title="−50 ms">&lt;</button>
+                        <button id="deleteDelayReset" class="stepper-reset" title="Reset to default">↺</button>
+                        <button id="deleteDelayUp" class="stepper-up" title="+50 ms">&gt;</button>
                     </div>
                 </fieldset>
             </details>
@@ -149,7 +242,8 @@
                 <div class="row">
                     <button id="start" class="sizeMedium danger" style="width: 150px;" title="Start the deletion process">▶︎ Delete</button>
                     <button id="stop" class="sizeMedium" title="Stop the deletion process" disabled>🛑 Stop</button>
-                    <button id="clear" class="sizeMedium">Clear log</button>
+                    <button id="clear" class="sizeMedium">Clear Log</button>
+                    <label class="row" style="margin-left: 12px; margin-bottom: 0;" title="Redact message content in the log preview"><input id="streamerMode" type="checkbox" checked>Streamer mode</label>
                 </div>
                 <div class="row">
                     <progress id="progressBar" style="display:none;"></progress>

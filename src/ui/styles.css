@@ -144,7 +144,155 @@
 }
 #undiscord .input-actions button {
     flex: 1;
+    /* Tighter horizontal padding than the base 16px so longer labels (Select, Delete) fit. */
+    padding: 2px 6px;
 }
+/* Action button accents — set: tinge-darker gray, add: muted forest green, del: bordeaux. */
+#undiscord .input-actions button[id^="set"]    { background-color: #3f4147; }
+#undiscord .input-actions button[id^="add"]    { background-color: #3a7d4d; }
+#undiscord .input-actions button[id^="del"]    { background-color: #722f37; }
+/* Select buttons: blue when idle, amber while waiting for a click, light purple
+   while waiting AND Shift is held (shift-lock — multi-capture mode). */
+#undiscord .input-actions button[id^="select"]                       { background-color: #2c5d8e; }
+#undiscord .input-actions button[id^="select"].active                { background-color: #b8860b; }
+#undiscord .input-actions button[id^="select"].active.shift-locked   { background-color: #a78bfa; }
+/* Global crosshair cursor while any Select button is armed. */
+body.undiscord-selecting,
+body.undiscord-selecting * { cursor: crosshair !important; }
+
+/* Inline Clear buttons — sit absolutely on the right edge of any text-input
+   wrapper. The .clearable class on the input adds matching right padding so
+   typed text doesn't slide under the button. */
+#undiscord .input-wrapper { position: relative; }
+#undiscord input.clearable { padding-right: 60px; }
+#undiscord button.clear-btn {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: auto;
+    min-width: 0;
+    height: 28px;
+    min-height: 28px;
+    padding: 0 10px;
+    font-size: 11px;
+    font-weight: 500;
+    background-color: #4e5058;
+    color: var(--_u-text);
+    border-radius: 4px;
+    cursor: pointer;
+    z-index: 1;
+}
+
+/* Date-preset shortcuts — green/amber/red traffic-light scaling with scope. */
+#undiscord .date-preset-day  { background-color: #3a7d4d; }
+#undiscord .date-preset-week { background-color: #b8860b; }
+#undiscord .date-preset-all  { background-color: #722f37; }
+
+/* Stepper rows for the delay controls. Compact buttons next to a read-only display. */
+#undiscord .stepper { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+/* Input takes a fixed ~100px (~20% narrower than before), text left-aligned so
+   short values don't drift around. The freed horizontal space goes to the
+   stepper buttons (flex: 1) which grow to fill it equally. The input is
+   editable — users can type a value directly and it auto-clamps on commit. */
+#undiscord .stepper input[type="text"] { flex: 0 0 100px; text-align: left; cursor: text; }
+#undiscord .stepper button { flex: 1; width: auto; min-width: 32px; padding: 0; font-weight: 700; }
+#undiscord .stepper-down { background-color: #722f37; }
+#undiscord .stepper-up { background-color: #3a7d4d; }
+#undiscord .stepper-reset { background-color: #2c5d8e; }
+
+/* Compact help button — pinned to the top-right of its fieldset (sibling of the
+   legend, since <legend> rendering doesn't reliably honor display:flex). The
+   right edge sits flush with the input/control edges below it. */
+#undiscord fieldset { position: relative; }
+#undiscord button.help-btn {
+    position: absolute;
+    top: -23px;
+    right: 0;
+    width: auto;
+    min-width: 0;
+    height: 16px;
+    min-height: 16px;
+    padding: 0 6px;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 3px;
+    background-color: #2c5d8e;
+    color: #ffffff;
+    cursor: pointer;
+}
+
+/* Tab-level help button: vertically centered inside the <summary>, right-aligned. */
+#undiscord summary button.help-btn {
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+}
+
+/* Has-type checkbox grid — 2 per row inside the Include filter. */
+#undiscord .has-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+    margin-bottom: 12px;
+}
+#undiscord .has-grid label {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0;
+    text-transform: none;
+    cursor: pointer;
+}
+#undiscord .has-grid input[type="checkbox"] {
+    margin-right: 6px;
+}
+
+/* Select dropdown styling — match the dark panel. */
+#undiscord select {
+    background-color: var(--_u-bg-input);
+    color: var(--_u-text);
+    border: 1px solid var(--_u-input-border);
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-family: var(--_u-font-display);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+/* Pill-style on/off toggle. Replaces every native checkbox visual inside the panel:
+   red when off, green when on. The .has-grid override below tightens margin in
+   the dense 2-column grids. */
+#undiscord input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    position: relative;
+    width: 36px;
+    height: 18px;
+    margin: 0 8px 0 0;
+    padding: 0;
+    border: none;
+    border-radius: 9px;
+    background-color: #722f37;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+#undiscord input[type="checkbox"]::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background-color: #ffffff;
+    transition: transform 0.2s ease;
+}
+#undiscord input[type="checkbox"]:checked { background-color: #3a7d4d; }
+#undiscord input[type="checkbox"]:checked::after { transform: translateX(18px); }
 
 #undiscord .sectionDescription.tips > div {
     padding-left: 0.9em;
@@ -478,10 +626,17 @@
 }
 
 #undiscord .sidebar {
-    overflow: hidden scroll;
-    overflow-y: auto;
+    /* Always reserve scrollbar space — overflow-y: scroll keeps the gutter
+       even when content fits, so right-aligned elements don't shift when the
+       sidebar starts overflowing. Fade-on-hover .scroll rules still hide the
+       bar visually until mouseover. */
+    overflow-x: hidden;
+    overflow-y: scroll;
+    /* flex-shrink: 0 locks the sidebar at its target width regardless of what
+       .main wants — without it, log content growing inside .main pulls space
+       from the sidebar via the flex layout, shifting everything in here. */
     width: 270px;
-    min-width: 250px;
+    flex-shrink: 0;
     height: 100%;
     max-height: 100%;
     padding: 8px;
@@ -508,8 +663,12 @@
     padding: 10px;
     user-select: text;
     flex-grow: 1;
-    flex-grow: 1;
     cursor: auto;
+    /* Wrap long lines at the panel's right edge instead of overflowing horizontally.
+       pre-wrap preserves intentional whitespace; overflow-wrap breaks unbroken
+       strings (URLs, snowflakes) when no whitespace is available to wrap on. */
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
 }
 
 #undiscord .tbar {
@@ -607,4 +766,70 @@
   transform: rotate(-45deg);
   background: repeating-linear-gradient(0, var(--_u-bg-accent, #3f4147), var(--_u-bg-accent, #3f4147) 1px, transparent 2px, transparent 4px);
   cursor: nwse-resize;
+}
+
+/* ----------------------------------------------------------------
+ * Server-bar trash icon — injected into Discord's left rail between
+ * the DM/Home separator and the first server. Mimics Discord's server
+ * icon shape-morph: circle at rest, rounded square on hover/active.
+ * Lives outside #undiscord, so selectors are global.
+ * ---------------------------------------------------------------- */
+#undiscord-server-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 48px;
+  cursor: pointer;
+  position: relative;
+  user-select: none;
+}
+#undiscord-server-btn .udl-blob {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: var(--background-floating, #1e1f22);
+  color: var(--interactive-normal, #b5bac1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: border-radius 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+#undiscord-server-btn:hover .udl-blob {
+  border-radius: 16px;
+  background-color: var(--button-danger-background, #da373c);
+  color: #ffffff;
+}
+#undiscord-server-btn.running .udl-blob {
+  border-radius: 16px;
+  background-color: var(--button-danger-background, #da373c);
+  color: #ffffff;
+}
+#undiscord-server-btn .udl-progress {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 4px;
+  display: none;
+}
+#undiscord-server-btn.running .udl-progress {
+  display: block;
+}
+/* Stoplight-amber progress on white track — grows as deletes complete, contrasts
+   cleanly against the red running-state blob. */
+#undiscord-server-btn .udl-progress::-webkit-progress-bar {
+  background-color: #ffffff;
+  border-radius: 2px;
+}
+#undiscord-server-btn .udl-progress::-webkit-progress-value {
+  background-color: #b8860b;
+  border-radius: 2px;
+  transition: width 0.2s ease;
+}
+#undiscord-server-btn .udl-progress::-moz-progress-bar {
+  background-color: #b8860b;
+  border-radius: 2px;
 }

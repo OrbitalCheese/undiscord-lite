@@ -37,8 +37,8 @@ const $ = s => ui.undiscordWindow.querySelector(s);
 
 // Channel input uses ';' to separate per-server groups, ',' between channels in a group.
 // e.g. server="X,Y" + channel="C1,C2;C3" → X gets C1+C2, Y gets C3.
-// An empty group (";", or "C1;") = server-wide wipe of that server.
-// If the channel input has no ';', we fall back to the legacy parallel-CSV interpretation
+// An empty group (";", or "C1;") means server-wide wipe of that server.
+// If the channel input has no ';', the legacy parallel-CSV interpretation is used
 // for backward compatibility — Add buttons rewrite it to grouped format on the next click.
 function parseTargets() {
   const guildRaw = $('input#guildId').value.trim();
@@ -78,10 +78,10 @@ function parseTargets() {
 }
 
 // Append a (server, channel) pair using the grouped format.
-//   - Adding (S, '') absorbs any (S, channels) — they're redundant.
-//   - Adding (S, C) is skipped if (S, '') already covers S.
-// Plain duplicates are silently ignored. Migrates legacy parallel-CSV input to
-// grouped format on the way in.
+//   - Adding (S, '') over (S, channels) absorbs the channels — server-wide wins.
+//   - Adding (S, C) over (S, '') narrows the server-wide entry to just C.
+//   - Plain duplicates surface as a "<id> is already in the queue." log line.
+// Migrates legacy parallel-CSV input to grouped format on the way in.
 function addPair(server, channel) {
   if (!server) return;
   const guildInput = $('input#guildId');
@@ -99,18 +99,25 @@ function addPair(server, channel) {
 
   if (channel === '') {
     // Server-wide. Absorb existing channel-specifics for this server.
+    if (!wasNew && groups[idx].length === 0) {
+      // Already queued as server-wide — nothing to do, but surface the no-op.
+      return log.info(`${server} is already queued as server-wide.`);
+    }
     if (!wasNew && groups[idx].length > 0) {
       log.warn(`Server-wide wipe of ${server} absorbed ${groups[idx].length} channel-specific entr${groups[idx].length === 1 ? 'y' : 'ies'}.`);
     }
     groups[idx] = [];
   } else {
-    // Channel-specific. If the server is currently server-wide, NARROW it to this channel
-    // (Add Channel after Add Server is the user telling us "actually, just this one").
+    // Channel-specific. If the server is currently server-wide, NARROW it to this
+    // channel. (Add Channel after Add Server means "actually, just this one".)
     if (!wasNew && groups[idx].length === 0) {
       log.info(`Server-wide wipe of ${server} narrowed to ${server}:${channel}.`);
       groups[idx] = [channel];
     } else {
-      if (groups[idx].includes(channel)) return; // plain dedup
+      if (groups[idx].includes(channel)) {
+        // Already queued — surface the no-op instead of silently returning.
+        return log.info(`${server}:${channel} is already in the queue.`);
+      }
       groups[idx].push(channel);
     }
   }
@@ -163,7 +170,6 @@ function writeQueue(servers, groups) {
   renderQueue();
 }
 
-// Remove a server (and all its channels) from the queue.
 function removeServer(server) {
   const { servers, groups } = readQueue($('input#guildId').value, $('input#channelId').value);
   const idx = servers.indexOf(server);
@@ -178,7 +184,7 @@ function removeServer(server) {
 }
 
 // Remove a single (server, channel) pair from the queue. If the server has no channels
-// left after removal, the server is dropped too (we never auto-convert to server-wide).
+// left after removal, the server is dropped too — there is no auto-conversion to server-wide.
 function removeChannel(server, channel) {
   const { servers, groups } = readQueue($('input#guildId').value, $('input#channelId').value);
   const idx = servers.indexOf(server);
@@ -197,9 +203,9 @@ function removeChannel(server, channel) {
   }
   groups[idx].splice(cIdx, 1);
   if (groups[idx].length === 0) {
-    servers.splice(idx, 1);
-    groups.splice(idx, 1);
-    log.info(`Removed ${server}:${channel} (last channel — server dropped from batch).`);
+    // Empty group means server-wide. Mirrors the opposite direction (Add Channel
+    // over a server-wide narrows it down) so removing the last channel widens it back out.
+    log.info(`Removed ${server}:${channel} — last channel, server converted to server-wide wipe.`);
   } else {
     log.info(`Removed ${server}:${channel} from the batch.`);
   }
@@ -227,7 +233,7 @@ function renderQueue() {
   let i = 0;
   for (const count of groups.values()) {
     const label = letterLabel(i++);
-    cells.push(`<span>Server: ${label}</span><span>|| Channels: ${count}</span>`);
+    cells.push(`<span>Server: ${label}</span><span>|| Channels: ${count === 0 ? 'All' : count}</span>`);
   }
   if (orphans) {
     cells.push(`<span class="qc-orphan">Orphans:</span><span class="qc-orphan">|| ${orphans} channel${orphans > 1 ? 's' : ''} without a server</span>`);
@@ -245,21 +251,31 @@ function letterLabel(i) {
   return s;
 }
 
+// Entry point. Called once on script load: injects the panel HTML/CSS, mounts the
+// floating trash-icon button, registers Ctrl+Shift+D, and binds every panel button
+// to its handler. After this returns, the script is idle until the user clicks Delete.
 function initUI() {
 
   insertCss(styles);
 
-  // create undiscord window
   ui.undiscordWindow = createElm(undiscordTemplate);
   document.body.appendChild(ui.undiscordWindow);
 
-  // make the window draggable (header) and resizable (8 edge/corner handles)
+  // draggable by the header, resizable from 8 edge/corner handles
   new Drag({ elm: ui.undiscordWindow, moveHandle: $('.header') });
 
-  // create undiscord Trash icon as a floating action button
+  // floating action button — fallback trash icon in the bottom-right.
+  // Stays hidden whenever the server-bar injection succeeds (see syncServerBarBtn).
   ui.undiscordBtn = createElm(buttonHtml);
   ui.undiscordBtn.onclick = toggleWindow;
   document.body.appendChild(ui.undiscordBtn);
+
+  // Server-bar injection — try to mount the trash icon inside Discord's left rail
+  // (between the DM/Home separator and the first server). Polls every 1s to
+  // re-inject if React drops it. Falls back to the FAB if Discord's DOM doesn't
+  // expose the expected anchors.
+  syncServerBarBtn();
+  setInterval(syncServerBarBtn, 1000);
 
   // keyboard shortcut: Ctrl+Shift+D toggles the panel
   document.addEventListener('keydown', (e) => {
@@ -281,6 +297,50 @@ function initUI() {
     }
   }
 
+  // Builds the trash-icon DOM element to inject into Discord's server bar.
+  // Style and shape come from the unscoped #undiscord-server-btn rules in styles.css.
+  function buildServerBarBtn() {
+    const div = document.createElement('div');
+    div.id = 'undiscord-server-btn';
+    div.setAttribute('role', 'button');
+    div.setAttribute('aria-label', 'Undiscord Lite');
+    div.setAttribute('tabindex', '0');
+    div.setAttribute('title', 'Undiscord Lite — click to open (Ctrl+Shift+D)');
+    div.draggable = false;
+    div.innerHTML = `
+      <div class="udl-blob">
+        <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M15 3.999V2H9V3.999H3V5.999H21V3.999H15Z"></path>
+          <path fill="currentColor" d="M5 6.99902V18.999C5 20.101 5.897 20.999 7 20.999H17C18.103 20.999 19 20.101 19 18.999V6.99902H5ZM11 17H9V11H11V17ZM15 17H13V11H15V17Z"></path>
+        </svg>
+        <progress class="udl-progress"></progress>
+      </div>`;
+    div.onclick = toggleWindow;
+    return div;
+  }
+
+  // Ensures the server-bar trash icon exists; injects if missing, hides the FAB
+  // when present, shows the FAB as fallback when Discord's DOM doesn't have the
+  // expected anchors (selector match by class prefix is robust to hash changes).
+  function syncServerBarBtn() {
+    let btn = document.getElementById('undiscord-server-btn');
+    if (!btn) {
+      const sep = document.querySelector('[class*="guildSeparator"]');
+      const item = sep && sep.closest('[class*="listItem"]');
+      if (item) {
+        btn = buildServerBarBtn();
+        item.insertAdjacentElement('afterend', btn);
+        ui.serverBarBtn = btn;
+        // Mirror running state if a job is already in flight.
+        if (undiscordCore.state.running) btn.classList.add('running');
+      }
+    } else {
+      ui.serverBarBtn = btn;
+    }
+    // FAB visibility mirrors injection state.
+    ui.undiscordBtn.style.display = btn ? 'none' : '';
+  }
+
   // cached elements
   ui.logArea = $('#logArea');
   ui.autoScroll = $('#autoScroll');
@@ -288,7 +348,6 @@ function initUI() {
   ui.progressIcon = ui.undiscordBtn.querySelector('progress');
   ui.percent = $('#progressPercent');
 
-  // register event listeners
   $('#hide').onclick = toggleWindow;
   $('button#start').onclick = startAction;
   $('button#stop').onclick = stopAction;
@@ -297,73 +356,180 @@ function initUI() {
     const id = getAuthorId();
     if (id) $('input#authorId').value = id;
   };
-  $('button#setGuild').onclick = () => {
-    const guildId = getGuildId();
-    if (!guildId) return;
-    $('input#guildId').value = guildId;
-    // For DMs, the channel ID is also needed (DMs have no server-wide concept).
-    // For real servers, clear the channel input — overwriting Server = "wipe this whole server".
-    if (guildId === '@me') {
-      const channelId = getChannelId();
-      $('input#channelId').value = channelId || '';
-    } else {
-      $('input#channelId').value = '';
-    }
-    renderQueue();
-  };
-  $('button#setChannel').onclick = () => {
-    const channelId = getChannelId();
-    const guildId = getGuildId();
-    if (channelId) $('input#channelId').value = channelId;
-    if (guildId) $('input#guildId').value = guildId;
-    renderQueue();
-  };
-  // Add Server: append (currentServer, '') as a server-wide-wipe entry.
+  // Server / Channel selection now uses the global selection-mode infrastructure
+  // (sel buttons), wired up alongside the other Select bindings below. The old
+  // URL-context-based setGuild/setChannel handlers are gone; the same workflow
+  // is achievable by clicking sel and then clicking the target in Discord.
+  // Add Server queues (currentServer, '') as a server-wide wipe.
   $('button#addGuild').onclick = () => addPair(getGuildId(), '');
-  // Add Channel: append (currentServer, currentChannel) as a specific-channel entry.
+  // Add Channel queues (currentServer, currentChannel) as a specific-channel entry.
   $('button#addChannel').onclick = () => {
     const server = getGuildId();
     const channel = getChannelId();
     if (server && channel) addPair(server, channel);
   };
-  // Del Server: remove the current server (and all its channels) from the batch.
   $('button#delGuild').onclick = () => {
     const server = getGuildId();
     if (server) removeServer(server);
   };
-  // Del Channel: remove the current (server, channel) pair from the batch.
   $('button#delChannel').onclick = () => {
     const server = getGuildId();
     const channel = getChannelId();
     if (server && channel) removeChannel(server, channel);
+  };
+  // Add all DMs: fetch the user's open DM channels (GET /users/@me/channels) and
+  // queue each as (@me, <channelId>). Group DMs (type 3) are skipped by default
+  // (red pill); toggle green to include them. DMs X'd out of the sidebar aren't
+  // returned by this endpoint, so they're skipped.
+  $('button#addAllDms').onclick = async () => {
+    const token = fillToken();
+    if (!token) return; // fillToken already logs the error.
+
+    log.info('Fetching your open DM channels...');
+    let channels;
+    try {
+      const resp = await fetch('https://discord.com/api/v9/users/@me/channels', {
+        headers: { 'Authorization': token },
+      });
+      if (!resp.ok) return log.error(`Could not fetch DMs — Discord returned ${resp.status}.`);
+      channels = await resp.json();
+    } catch (err) {
+      return log.error('Network error fetching DMs:', err);
+    }
+
+    const includeGroups = $('input#includeGroupDms').checked;
+    const dms = channels.filter(c => c.type === 1 || (includeGroups && c.type === 3));
+    if (!dms.length) return log.info('No open DM channels found.');
+
+    for (const c of dms) addPair('@me', c.id);
+
+    const direct = dms.filter(c => c.type === 1).length;
+    const group = dms.filter(c => c.type === 3).length;
+    const summary = includeGroups
+      ? `Queued ${dms.length} DM${dms.length === 1 ? '' : 's'} (${direct} direct, ${group} group).`
+      : `Queued ${direct} direct DM${direct === 1 ? '' : 's'} (group DMs excluded).`;
+    log.info(summary);
+  };
+  // Del DMs: strip the @me server entry (and all its DM channels) from the queue.
+  $('button#delAllDms').onclick = () => {
+    const { servers, groups } = readQueue($('input#guildId').value, $('input#channelId').value);
+    const idx = servers.indexOf('@me');
+    if (idx === -1) return log.info('No DMs in the queue to remove.');
+    const dmCount = groups[idx].length;
+    servers.splice(idx, 1);
+    groups.splice(idx, 1);
+    if (dmCount === 0) {
+      log.info('Removed @me from the queue.');
+    } else {
+      log.info(`Removed ${dmCount} DM${dmCount === 1 ? '' : 's'} from the queue.`);
+    }
+    writeQueue(servers, groups);
   };
 
   // Live-update the queue counter when the user manually edits either input.
   $('input#guildId').addEventListener('input', renderQueue);
   $('input#channelId').addEventListener('input', renderQueue);
   renderQueue();
-  // sync delays
-  $('input#searchDelay').onchange = (e) => {
-    const v = parseInt(e.target.value);
-    if (v) {
-      undiscordCore.options.searchDelay = v;
-      undiscordCore.state._userSearchDelay = v; // retarget the decay baseline
-    }
+
+  // Stepper controls for search/delete delays. User-driven changes go straight to
+  // core options + decay baseline. Rate-limit bumps inside core can still push the
+  // effective delay above the user's max temporarily; it decays back to the baseline.
+  setDelayDisplay('searchDelay', SEARCH_DEFAULT);
+  setDelayDisplay('deleteDelay', DELETE_DEFAULT);
+  bindStepper('searchDelay', SEARCH_MIN, SEARCH_MAX, SEARCH_STEP, SEARCH_DEFAULT, '_userSearchDelay');
+  bindStepper('deleteDelay', DELETE_MIN, DELETE_MAX, DELETE_STEP, DELETE_DEFAULT, '_userDeleteDelay');
+
+  // Strip Discord message links pasted into the message-interval inputs down to the trailing ID.
+  bindLinkStrip($('input#minId'));
+  bindLinkStrip($('input#maxId'));
+
+  // Paste handling for user-ID fields:
+  //   - Author ID and Skip mentions support multiple IDs (Cartesian batching for
+  //     authors, post-filter list-check for skips). Multi-paste appends with dedup.
+  //   - Include mentions (Search filter) is single-value because Discord's
+  //     `mentions=` query param only accepts one ID per request. Pastes overwrite.
+  bindMultiUserPaste($('input#authorId'),          'Author ID');
+  bindSingleUserPaste($('input#mentionsId'),       'Mentions');
+  bindMultiUserPaste($('input#excludeMentionsId'), 'Skip mentions');
+
+  // Point-and-click ID capture: each Select button arms a global click listener;
+  // the next click on a Discord user/avatar/message/server-icon/channel extracts
+  // the relevant ID. Server and Channel sel buttons replace the old URL-based
+  // setGuild/setChannel — same workflow, just click instead of view-and-press.
+  bindSelector('selectAuthor',         'authorId',         'user',    'Author ID');
+  bindSelector('selectGuild',          'guildId',          'server',  'Server ID');
+  bindSelector('selectChannel',        'channelId',        'channel', 'Channel ID');
+  bindSelector('selectMentions',       'mentionsId',       'user-single', 'Mentions');
+  bindSelector('selectExcludeMentions','excludeMentionsId','user',    'Skip mentions');
+  bindSelector('selectMinId',          'minId',            'message', 'After message ID');
+  bindSelector('selectMaxId',          'maxId',            'message', 'Before message ID');
+
+  // Clear buttons inside each text input. Server clear cascades to Channel
+  // (channels are scoped to a parent server). Channel clear leaves Server alone.
+  bindClearButton('clearAuthor',          'authorId',          'Author ID');
+  bindClearButton('clearSearch',          'search',            'Include text');
+  bindClearButton('clearExcludeSearch',   'excludeSearch',     'Skip text');
+  bindClearButton('clearMentions',        'mentionsId',        'Mentions');
+  bindClearButton('clearExcludeMentions', 'excludeMentionsId', 'Skip mentions');
+  bindClearButton('clearMinId',           'minId',             'After message ID');
+  bindClearButton('clearMaxId',           'maxId',             'Before message ID');
+  // Server clear also clears Channel — Channel can't exist without its parent.
+  $('button#clearGuild').onclick = () => {
+    const g = $('input#guildId'), c = $('input#channelId');
+    if (!g.value.trim() && !c.value.trim()) return log.info('Server and Channel are already empty.');
+    g.value = '';
+    c.value = '';
+    log.info('Cleared Server and Channel fields.');
+    renderQueue();
   };
-  $('input#deleteDelay').onchange = (e) => {
-    const v = parseInt(e.target.value);
-    if (v) {
-      undiscordCore.options.deleteDelay = v;
-      undiscordCore.state._userDeleteDelay = v; // retarget the decay baseline
-    }
+  // Channel clear leaves Server intact.
+  $('button#clearChannel').onclick = () => {
+    const c = $('input#channelId');
+    if (!c.value.trim()) return log.info('Channel field is already empty.');
+    c.value = '';
+    log.info('Cleared Channel field.');
+    renderQueue();
   };
 
-  $('input#searchDelay').addEventListener('input', (event) => {
-    $('div#searchDelayValue').textContent = event.target.value + 'ms';
+  // Date interval shortcuts. 1 day / 1 week set min=now−Δ, max=now. "all" resets
+  // After to Discord's epoch (visible lower bound) and clears Before (no upper bound).
+  $('button#datePresetDay').onclick  = () => setDateRange(1);
+  $('button#datePresetWeek').onclick = () => setDateRange(7);
+  $('button#datePresetAll').onclick  = () => setDateRange(null);
+
+  // Live pre-2015 clamp on each date field — fires the moment the user commits a value.
+  bindDateClamp('minDate', 'After date');
+  bindDateClamp('maxDate', 'Before date');
+
+  // Exclude-match pill: flips the label text alongside the pill state for clarity.
+  $('input#excludeMatchPill').addEventListener('change', (e) => {
+    $('#excludeMatchLabel').textContent = e.target.checked ? 'Substring' : 'Exact';
   });
-  $('input#deleteDelay').addEventListener('input', (event) => {
-    $('div#deleteDelayValue').textContent = event.target.value + 'ms';
+
+  // Group-DMs pill: red (unchecked, default) = skip group DMs in the bulk add;
+  // green (checked) = include them. Label flips to match the active state.
+  $('input#includeGroupDms').addEventListener('change', (e) => {
+    $('#includeGroupDmsLabel').textContent = e.target.checked ? "Including all group DM's" : "Skipping all group DM's";
   });
+
+  // Help-button delegation: every <button class="help-btn" data-help="<key>"> in the
+  // panel routes to the matching HELP_TEXT entry. preventDefault stops the click
+  // from triggering the parent <details> when the button is embedded in a <summary>.
+  ui.undiscordWindow.addEventListener('click', (e) => {
+    const btn = e.target.closest('button.help-btn');
+    if (btn) {
+      e.preventDefault();
+      e.stopPropagation();
+      showHelp(btn.dataset.help);
+    }
+  });
+
+  // Mutually-exclusive checkbox pairs between Search filter and Delete filter — checking
+  // one auto-unchecks its counterpart. Both checked at once would always match nothing.
+  for (const t of ['Link', 'Image', 'Video', 'Sound', 'Sticker', 'Poll', 'Embed', 'Forward']) {
+    bindMutex(`has${t}`, `exclude${t}`);
+  }
+  bindMutex('mentionEveryone', 'excludeMentionEveryone');
 
   // redirect console logs to inside the window after setting up the UI
   setLogFn(printLog);
@@ -371,8 +537,662 @@ function initUI() {
   bindCoreEvents();
 }
 
+// ---- Date interval helpers ----
+
+// Discord's snowflake epoch — no messages exist before this timestamp.
+const DISCORD_EPOCH_LOCAL = '2015-01-01T00:00';
+const DISCORD_EPOCH_MS = new Date(DISCORD_EPOCH_LOCAL).getTime();
+
+// Format a Date as the YYYY-MM-DDTHH:MM string that <input type="datetime-local"> requires.
+function fmtLocal(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// On every committed change to a date input, snap out-of-range values back into
+// [Discord epoch, now] and emit a warning. Empty values and currently-invalid
+// drafts are left alone (startAction surfaces parse errors at run time).
+function bindDateClamp(inputId, fieldName) {
+  const input = $(`input#${inputId}`);
+  input.addEventListener('change', () => {
+    const v = input.value.trim();
+    if (!v) return;
+    const ms = new Date(v).getTime();
+    if (Number.isNaN(ms)) return;
+    if (ms < DISCORD_EPOCH_MS) {
+      input.value = DISCORD_EPOCH_LOCAL;
+      log.warn(`"${fieldName}" was before 2015-01-01 — clamped to ${DISCORD_EPOCH_LOCAL} (Discord did not exist before then).`);
+    } else if (ms > Date.now()) {
+      const nowLocal = fmtLocal(new Date());
+      input.value = nowLocal;
+      log.warn(`"${fieldName}" was in the future — clamped to ${nowLocal} (no messages exist yet for that time).`);
+    }
+  });
+}
+
+// Sets the After/Before date inputs to "now − N days" through "now". Pass null
+// for "all time" — After resets to Discord's epoch (visually clear that the
+// lower bound is the launch date), Before clears (no upper bound).
+function setDateRange(days) {
+  const minInput = $('input#minDate');
+  const maxInput = $('input#maxDate');
+  if (days === null) {
+    minInput.value = DISCORD_EPOCH_LOCAL;
+    maxInput.value = '';
+    return;
+  }
+  const now = new Date();
+  const past = new Date(now.getTime() - days * 86400000);
+  minInput.value = fmtLocal(past);
+  maxInput.value = fmtLocal(now);
+}
+
+// ---- Help-button registry ----
+
+// Each key maps to a { name, lines } entry printed into the log when a [Help]
+// button with the matching `data-help=<key>` attribute is clicked. HTML is
+// preserved in lines (so <i>/<b>/<code> work); use &lt;/&gt; for literal angle
+// brackets and &nbsp; for indentation.
+//
+// To add help for a new section:
+//   1. Add a key + { name, lines: [...] } entry below.
+//   2. Add a <button class="help-btn" data-help="<key>">Help</button> as a
+//      sibling of the relevant <legend> in undiscord.html.
+const HELP_TEXT = {
+  tabGeneral: {
+    name: 'General',
+    lines: [
+      "Defines <i>who</i> is being deleted (Author ID), <i>where</i> (Server / Channel / DMs), and builds the queue for batch wipes.",
+      "Each fieldset has its own <b>[Help]</b> button for detailed instructions on that field.",
+      "Multiple servers and channels can be queued — the run processes them sequentially as one batch.",
+    ],
+  },
+  tabSearchFilter: {
+    name: 'Search filter',
+    lines: [
+      "Narrows what Discord's search API returns before the script considers anything for deletion. Server-side filters are faster than client-side ones.",
+      "Three groups: <b>Include text</b>, <b>Include attachment type</b>, <b>Include @user</b>. Each has its own [Help] for details.",
+      "Anything Discord returns can still be excluded post-search via the <b>Delete filter</b> tab.",
+    ],
+  },
+  tabDeleteFilter: {
+    name: 'Delete filter',
+    lines: [
+      "Drops messages from the deletion list <i>after</i> Discord's search returns them. Same three-group shape as the Search filter — text, attachment types, @user.",
+      "Each Search/Delete attachment-type pair is mutually exclusive — checking one auto-unchecks the other (both checked at once would always match nothing).",
+      "Useful when Discord's tokenized search can't express what you want — e.g. \"delete everything <i>except</i> messages mentioning Alice.\"",
+    ],
+  },
+  tabMessagesInterval: {
+    name: 'Messages interval',
+    lines: [
+      "Bound the wipe to a snowflake range using two message IDs.",
+      "Right-click any message → <b>Copy Message Link</b>, paste into either field. The script auto-strips the URL down to just the ID.",
+      "<b>Messages interval overrides Date interval</b> if both are set.",
+    ],
+  },
+  tabDateInterval: {
+    name: 'Date interval',
+    lines: [
+      "Bound the wipe by date. Use the date pickers, or click <b>1 day</b> / <b>1 week</b> / <b>all</b> for convenience presets.",
+      "Pre-2015 and future dates auto-clamp on input with a warning. After defaults to Discord's launch (2015-01-01).",
+      "Ignored if <b>Messages interval</b> is also set.",
+    ],
+  },
+  tabAdvanced: {
+    name: 'Advanced settings',
+    lines: [
+      "Tune the per-page wait (<b>Search delay</b>) and per-delete pause (<b>Delete delay</b>).",
+      "Both auto-bump on Discord's 429 rate-limit responses, then decay back toward your slider value as subsequent requests succeed.",
+      "Defaults (45000 ms search / 1000 ms delete) are tuned to never trigger 429s. Lower at your own risk.",
+    ],
+  },
+  authorId: {
+    name: 'Author ID',
+    lines: [
+      "The UserID of the person whose messages you want to delete.",
+      "Click <b>Me</b> to autofill your own UserID.",
+      "You <i>can</i> delete others' messages if you have <i>Manage Messages</i> permission over them — e.g. you're an admin in a server you own, or have mod perms in.",
+      "To copy someone else's UserID from a chat:",
+      "&nbsp;&nbsp;1. Enable Developer Mode (Discord settings &rarr; Advanced).",
+      "&nbsp;&nbsp;2. Right-click their profile icon &rarr; <b>Copy User ID</b>.",
+      "&nbsp;&nbsp;3. Right-click a message &rarr; <b>Copy Message ID</b> (also useful for Messages interval).",
+      "To chain multiple people, comma-separate the IDs: <code>id1,id2,id3</code>. The run expands to one job per (target × author).",
+      "Non-self authors require <i>Manage Messages</i> permission on their target server. A pre-flight check runs once at the top of the batch and aborts early if any pair lacks it.",
+      "DMs are excluded from multi-author batching — Discord only lets you delete your own DM messages, so each DM target spawns one self-author job regardless of how many IDs are in the list.",
+    ],
+  },
+  serverId: {
+    name: 'Server ID',
+    lines: [
+      "The Discord Server (Guild) where messages should be deleted.",
+      "Click <b>set</b> while viewing a server to fill the field from your current location.",
+      "Click <b>add</b> to queue this server alongside others — supports any number of servers in one batch run.",
+      "An empty <b>Channel ID</b> with this set means <i>wipe the entire server</i> (every channel you have access to).",
+      "Right-click a server icon &rarr; <b>Copy Server ID</b> (Developer Mode required).",
+    ],
+  },
+  channelId: {
+    name: 'Channel ID',
+    lines: [
+      "Restrict the wipe to a specific channel inside the queued server.",
+      "Click <b>set</b>/<b>add</b> while inside a channel to populate from your current view.",
+      "Click <b>del</b> to remove the current channel from the queue. If it's the last channel under that server, the server reverts to a server-wide wipe.",
+      "Leave empty (with a Server ID set) to target the whole server.",
+      "Right-click a channel name &rarr; <b>Copy Channel ID</b> (Developer Mode required).",
+    ],
+  },
+  dms: {
+    name: 'DMs',
+    lines: [
+      "Click <b>Add DM's</b> to queue every DM channel currently open in your sidebar — both 1:1 and group DMs.",
+      "Click <b>Clear DM's</b> to remove every queued DM at once.",
+      "The <b>group DMs</b> pill controls whether group DMs are included in the bulk add. Default red/off skips them; toggle green/on to include them.",
+      "DMs you've X'd out of the sidebar aren't returned by Discord's API — re-open them in Discord first if you need them included.",
+      "Uses Discord's <code>GET /users/@me/channels</code> endpoint with your existing auth token.",
+    ],
+  },
+  includeText: {
+    name: 'Include text',
+    lines: [
+      "Only search for messages whose content contains this text.",
+      "Discord's search is <i>tokenized</i> and case-insensitive: <b>cat</b> matches messages with the word <i>cat</i> but not <i>catdog</i> or <i>category</i>.",
+      "Leave empty to match any text content.",
+    ],
+  },
+  includeAttachment: {
+    name: 'Include attachment type',
+    lines: [
+      "Restrict the search to messages that include the toggled type(s): Link, Image, Video, Sound, Sticker, Poll, Embed, Forward.",
+      "Multiple toggles are <b>AND-combined</b> by Discord — checking Image AND Video returns messages with <i>both</i>, not either. Most users want to check one at a time.",
+      "<b>Pinned</b>: choose <i>exclude</i> (skip pinned), <i>include</i> (delete pinned alongside others), or <i>only pinned</i> (target pinned only).",
+    ],
+  },
+  includeUser: {
+    name: 'Include @user',
+    lines: [
+      "Restrict the search to messages where this user is @mentioned.",
+      "<b>Single user only</b> — Discord's search API can only filter by one mentioned user per request, so this field accepts exactly one ID. Pasting or capturing a new ID overwrites the current value.",
+      "If you need to match several mentioned users, run separate passes (one per ID). The asymmetry only affects this side — see <b>Skip @user</b> for the multi-value variant.",
+      "Toggle <b>has @everyone / @here</b> to also include messages that pinged everyone or online users.",
+      "Right-click a user &rarr; <b>Copy User ID</b> (Developer Mode required), or use <b>Select</b> and click any avatar/username in the message list.",
+      "Leave the field empty to ignore mentions when matching.",
+    ],
+  },
+  excludeText: {
+    name: 'Skip text',
+    lines: [
+      "Skip messages whose content matches this text — they survive the run.",
+      "<b>Match: Substring</b> — term appears anywhere (<i>cat</i> skips <i>I love my cat</i> AND <i>I love cats</i>).",
+      "<b>Match: Exact</b> — term must appear as a standalone word (<i>cat</i> skips <i>I love my cat</i> but NOT <i>I love cats</i>).",
+      "Applied client-side after the search response — works in combination with the include side.",
+    ],
+  },
+  excludeAttachment: {
+    name: 'Skip attachment type',
+    lines: [
+      "Skip messages that include the toggled type(s) — they survive the run.",
+      "Mutually exclusive with the matching toggle in <b>Include attachment type</b>: checking one here automatically un-checks its counterpart on the search side, since both checked at once would always match nothing.",
+      "Applied client-side after the search response.",
+    ],
+  },
+  excludeUser: {
+    name: 'Skip @user',
+    lines: [
+      "Skip messages where any of these users are @mentioned — they survive the run.",
+      "<b>Multi-value</b> — comma-separate any number of user IDs, or paste/capture them one at a time and they'll append (with dedup). Every listed ID is checked against each message's mentions at filter time, so all of them work in a single pass — unlike <b>Include @user</b>, this side has no API limit because it's a client-side check after the search response.",
+      "Toggle <b>skip @everyone / @here</b> to also skip messages that pinged everyone or online users.",
+      "Right-click a user &rarr; <b>Copy User ID</b> (Developer Mode required), or use <b>Select</b> and click avatars/usernames; hold Shift to capture several in a row.",
+      "An ID listed here cannot also be in <b>Include @user</b> — that combination would always match nothing.",
+    ],
+  },
+  messagesInterval: {
+    name: 'Messages interval',
+    lines: [
+      "Bound the search to messages between two specific message IDs (Discord snowflakes).",
+      "Right-click a message &rarr; <b>Copy Message Link</b>, then paste into either field — the script auto-strips the URL to just the trailing message ID.",
+      "<b>After ID</b> must be older (smaller snowflake) than <b>Before ID</b>.",
+      "If only one bound is set, the other is unbounded (channel start or current time).",
+      "<b>Messages interval overrides Date interval</b> if both are set.",
+    ],
+  },
+  dateInterval: {
+    name: 'Date interval',
+    lines: [
+      "Bound the search to messages posted between two dates.",
+      "Use the datetime pickers, or click <b>1 day</b> / <b>1 week</b> / <b>all</b> for convenience presets.",
+      "<b>After date</b> defaults to Discord's launch (2015-01-01) so the lower bound is always explicit.",
+      "Both fields auto-clamp to <code>[2015-01-01, now]</code> on input — out-of-range values snap and log a warning.",
+      "If only one bound is set, the other is unbounded.",
+      "<b>Date interval is ignored</b> if Messages interval is also set.",
+    ],
+  },
+  searchDelay: {
+    name: 'Search delay',
+    lines: [
+      "Time the script waits between fetching pages of messages from Discord's search API.",
+      "Range <b>15000–60000 ms</b>, default <b>45000 ms</b> (45s).",
+      "Lower = faster but more 429 rate-limit hits. Discord throttles search aggressively below ~30s.",
+      "On a 429, the effective delay auto-bumps to whatever Discord asks for, then decays back toward your slider value as subsequent requests succeed (half-life decay).",
+      "Click <b>↺</b> to reset to default.",
+    ],
+  },
+  deleteDelay: {
+    name: 'Delete delay',
+    lines: [
+      "Pause between individual delete API calls.",
+      "Range <b>100–3000 ms</b>, default <b>1000 ms</b> (1s).",
+      "Lower = faster, but more risk of mid-run rate-limiting.",
+      "Same auto-bump and half-life-decay behavior as Search delay.",
+      "Click <b>↺</b> to reset to default.",
+    ],
+  },
+};
+
+function showHelp(key) {
+  const entry = HELP_TEXT[key];
+  if (!entry) return;
+  log.info(`── ${entry.name.toUpperCase()} ──`);
+  for (const line of entry.lines) log.info(`› ${line}`);
+}
+
+// ---- Mutually-exclusive checkbox pair ----
+
+// When the user checks one checkbox, silently uncheck its paired counterpart so they
+// can't both be on at once (which would always produce an empty result set).
+function bindMutex(idA, idB) {
+  const a = $(`input#${idA}`);
+  const b = $(`input#${idB}`);
+  a.addEventListener('change', () => { if (a.checked && b.checked) b.checked = false; });
+  b.addEventListener('change', () => { if (a.checked && b.checked) a.checked = false; });
+}
+
+// ---- Delay stepper helpers ----
+
+const SEARCH_MIN = 15000, SEARCH_MAX = 60000, SEARCH_STEP = 500, SEARCH_DEFAULT = 45000;
+const DELETE_MIN = 100,   DELETE_MAX = 3000,  DELETE_STEP = 50,  DELETE_DEFAULT = 1000;
+
+// Display delays as raw integers — unit suffix lives in the legend "(ms)" instead.
+function setDelayDisplay(inputId, ms) {
+  const input = $(`input#${inputId}`);
+  input.dataset.ms = ms;
+  input.value = String(ms);
+}
+
+function getDelayMs(inputId) {
+  return parseInt($(`input#${inputId}`).dataset.ms);
+}
+
+function bindStepper(inputId, min, max, step, defaultMs, stateKey) {
+  const apply = (next) => {
+    next = Math.max(min, Math.min(max, next));
+    setDelayDisplay(inputId, next);
+    undiscordCore.options[inputId] = next;
+    undiscordCore.state[stateKey] = next;
+  };
+  $(`button#${inputId}Down`).onclick  = () => apply(getDelayMs(inputId) - step);
+  $(`button#${inputId}Up`).onclick    = () => apply(getDelayMs(inputId) + step);
+  $(`button#${inputId}Reset`).onclick = () => apply(defaultMs);
+
+  // Direct typing — parse the digits the user typed, clamp to [min, max], apply.
+  // Strips the trailing " ms" suffix and any other non-numeric characters so the
+  // user can edit the displayed string in place. Fires on blur or Enter.
+  const input = $(`input#${inputId}`);
+  input.addEventListener('change', () => {
+    const raw = input.value.replace(/[^\d.]/g, '');
+    const parsed = parseFloat(raw);
+    if (Number.isNaN(parsed)) {
+      setDelayDisplay(inputId, getDelayMs(inputId)); // revert to last good value
+      log.warn(`Invalid delay value — reverted.`);
+      return;
+    }
+    const rounded = Math.round(parsed);
+    const clamped = Math.max(min, Math.min(max, rounded));
+    if (clamped !== rounded) {
+      log.info(`${inputId} clamped from ${rounded} ms to ${clamped} ms (range ${min}–${max}).`);
+    }
+    apply(clamped);
+  });
+  // Enter commits the edit and blurs (browsers fire change on blur after edit).
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+}
+
+// ---- Message link auto-strip ----
+
+// On paste, if the clipboard contains a Discord message link, replace the
+// pasted content with just the trailing message ID. Otherwise paste as normal.
+function bindLinkStrip(input) {
+  input.addEventListener('paste', (e) => {
+    const text = ((e.clipboardData || window.clipboardData).getData('text') || '').trim();
+    const m = text.match(/^https?:\/\/(?:[\w.-]+\.)?discord\.com\/channels\/[\w@]+\/\d+\/(\d{15,25})\/?$/);
+    if (m) {
+      e.preventDefault();
+      input.value = m[1];
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  });
+}
+
+// ---- Point-and-click ID capture (selection mode) ----
+
+// Active-selection state. Single instance — only one Select can be armed at a
+// time. Shape: { input, type, label, button } where type is one of
+// 'user' | 'user-single' | 'server' | 'channel' | 'message'.
+let selection = null;
+let selectionTimeout = null;
+const SELECTION_TIMEOUT_MS = 60000;
+
+// Walks up from the click target to find a Discord message wrapper, then
+// extracts the message ID from its `id="chat-messages-CHANNEL-MESSAGE"` attribute.
+// That id pattern has been stable in Discord for years.
+function extractMessageId(elem) {
+  const wrapper = elem.closest && elem.closest('[id^="chat-messages-"]');
+  const m = wrapper && wrapper.id.match(/chat-messages-\d+-(\d+)/);
+  return m ? m[1] : null;
+}
+
+// Extracts a server (guild) ID. Discord's server-list items carry
+// `data-list-item-id="guildsnav___<SERVERID>"`. Falls back to the URL of the
+// currently-viewed server (`/channels/<server>/<channel>`) so the user can
+// click anywhere within a server view to capture its ID.
+function extractServerId(elem) {
+  const item = elem.closest && elem.closest('[data-list-item-id^="guildsnav___"]');
+  if (item) {
+    const m = item.getAttribute('data-list-item-id').match(/guildsnav___(\d+)/);
+    if (m) return m[1];
+  }
+  const urlMatch = location.href.match(/channels\/(\w+)\/\d+/);
+  return urlMatch ? urlMatch[1] : null;
+}
+
+// Extracts a channel ID. Tries (in order) a channel-list item attribute, the
+// chat-messages wrapper's encoded channel, and finally the URL of the
+// currently-viewed channel.
+function extractChannelId(elem) {
+  const item = elem.closest && elem.closest('[data-list-item-id^="channels___"]');
+  if (item) {
+    const m = item.getAttribute('data-list-item-id').match(/channels___(\d+)/);
+    if (m) return m[1];
+  }
+  const msg = elem.closest && elem.closest('[id^="chat-messages-"]');
+  if (msg) {
+    const m = msg.id.match(/chat-messages-(\d+)-\d+/);
+    if (m) return m[1];
+  }
+  const urlMatch = location.href.match(/channels\/\w+\/(\d+)/);
+  return urlMatch ? urlMatch[1] : null;
+}
+
+// Pulls the author user-ID out of any Discord CDN URL form we know about.
+//   - Global avatar : cdn.discordapp.com/avatars/<UID>/<HASH>.<ext>
+//   - Per-server    : cdn.discordapp.com/guilds/<GID>/users/<UID>/avatars/<HASH>.<ext>
+//   - Banner / etc  : cdn.discordapp.com/banners/<UID>/<HASH>.<ext>  (rare in chat, harmless to support)
+// The /users/ form must be checked BEFORE /avatars/ since per-server URLs contain
+// both segments, but only /users/<UID>/ holds the user's ID.
+function userIdFromCdnUrl(url) {
+  if (!url) return null;
+  const m = url.match(/\/users\/(\d+)\//) || url.match(/\/avatars\/(\d+)\//) || url.match(/\/banners\/(\d+)\//);
+  return m ? m[1] : null;
+}
+
+// Scans every Discord-CDN image inside a message <li> for a user ID.
+function scanMessageForUid(msg) {
+  const candidates = msg.querySelectorAll('img[src*="cdn.discordapp.com"], img[src*="discordapp.net"]');
+  for (const c of candidates) {
+    const id = userIdFromCdnUrl(c.src);
+    if (id) return id;
+  }
+  return null;
+}
+
+function extractUserId(elem) {
+  // 1. Avatar/banner at or near the click target — most reliable.
+  const img = (elem.closest && elem.closest('img')) || (elem.querySelector && elem.querySelector('img'));
+  const fromImg = img && userIdFromCdnUrl(img.src);
+  if (fromImg) return fromImg;
+
+  // 2. Walk up to the enclosing message and try every CDN-served image inside.
+  //    Server-scoped avatars use /guilds/<GID>/users/<UID>/avatars/<HASH>, so we
+  //    can't restrict the selector to "src contains avatars/" — match users/ too.
+  const msg = elem.closest && elem.closest('[id^="chat-messages-"]');
+  if (msg) {
+    const direct = scanMessageForUid(msg);
+    if (direct) return direct;
+
+    // 2b. Grouped follow-up message: Discord renders consecutive same-author posts
+    //     as one "group" where only the FIRST <li> carries the avatar / username
+    //     header. Subsequent posts in the bundle have no img to scan. Walk back
+    //     through previous siblings (skipping dividers, timestamps, system rows
+    //     with no avatar) until we hit a sibling that yields a user ID — that's
+    //     the group head, which by Discord's grouping rules is the same author.
+    let cursor = msg.previousElementSibling;
+    while (cursor) {
+      const id = scanMessageForUid(cursor);
+      if (id) return id;
+      cursor = cursor.previousElementSibling;
+    }
+  }
+
+  // 3. Explicit data-user-id attribute (mentions, some popout elements).
+  const withData = elem.closest && elem.closest('[data-user-id]');
+  return (withData && withData.getAttribute('data-user-id')) || null;
+}
+
+function startSelection(input, type, label, button) {
+  // Re-clicking the active Select button toggles it off.
+  if (selection && selection.button === button) {
+    cancelSelection();
+    log.info('Selection cancelled.');
+    return;
+  }
+  if (selection) cancelSelection();
+
+  selection = { input, type, label, button };
+  button.classList.add('active');
+  document.body.classList.add('undiscord-selecting');
+  document.addEventListener('click',   handleSelectionClick, true);
+  document.addEventListener('keydown', handleSelectionKey,   true);
+  document.addEventListener('keyup',   handleSelectionKey,   true);
+  resetSelectionTimeout();
+
+  const target =
+    (type === 'user' || type === 'user-single') ? 'a user, avatar, or message author' :
+    type === 'server'  ? 'a server icon in the left rail' :
+    type === 'channel' ? 'a channel in the sidebar (or any message in it)' :
+                         'a message';
+  log.info(`Select mode active for ${label}: click ${target} in Discord to capture its ID. Hold Shift to capture multiple in a row. Esc to cancel.`);
+}
+
+function cancelSelection() {
+  if (!selection) return;
+  selection.button.classList.remove('active');
+  selection.button.classList.remove('shift-locked');
+  document.body.classList.remove('undiscord-selecting');
+  document.removeEventListener('click',   handleSelectionClick, true);
+  document.removeEventListener('keydown', handleSelectionKey,   true);
+  document.removeEventListener('keyup',   handleSelectionKey,   true);
+  if (selectionTimeout) { clearTimeout(selectionTimeout); selectionTimeout = null; }
+  selection = null;
+}
+
+// Restart the 60s auto-cancel timer — called on selection start and after each
+// shift-held capture (so a long multi-select run doesn't time out mid-batch).
+function resetSelectionTimeout() {
+  if (selectionTimeout) clearTimeout(selectionTimeout);
+  selectionTimeout = setTimeout(() => {
+    log.warn('Selection mode timed out after 60s — cancelled.');
+    cancelSelection();
+  }, SELECTION_TIMEOUT_MS);
+}
+
+// Capture-phase click handler — fires before Discord's own listeners so we can
+// suppress popouts / message-jumps / etc. when extracting.
+function handleSelectionClick(e) {
+  // Clicks inside our panel (including on Select buttons themselves) bubble
+  // through normally so the user can toggle modes / interact with the UI.
+  if (e.target.closest('#undiscord') || e.target.closest('#undiscord-server-btn')) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  const t = selection.type;
+  const id =
+    (t === 'user' || t === 'user-single') ? extractUserId(e.target)    :
+    t === 'message'                       ? extractMessageId(e.target) :
+    t === 'server'                        ? extractServerId(e.target)  :
+    t === 'channel'                       ? extractChannelId(e.target) : null;
+  if (!id) {
+    const typeLabel = selection.type === 'user-single' ? 'user' : selection.type;
+    log.warn(`Couldn't extract a ${typeLabel} ID from the clicked element. Selection cancelled.`);
+    cancelSelection();
+    return;
+  }
+  insertCapturedId(selection.input, selection.label, id, selection.type);
+
+  // Shift-held → stay in selection mode for another capture; refresh the timeout
+  // so a long batch run doesn't auto-cancel mid-stream. Otherwise exit normally.
+  if (e.shiftKey) {
+    resetSelectionTimeout();
+  } else {
+    cancelSelection();
+  }
+}
+
+// Unified keydown/keyup handler:
+//   - Esc cancels selection mode entirely.
+//   - Shift down/up toggles the shift-lock visual on the active button (green
+//     while held, amber otherwise).
+function handleSelectionKey(e) {
+  if (e.key === 'Escape' && e.type === 'keydown') {
+    cancelSelection();
+    log.info('Selection cancelled.');
+    return;
+  }
+  if (e.key === 'Shift' && selection) {
+    if (e.type === 'keydown') selection.button.classList.add('shift-locked');
+    else                       selection.button.classList.remove('shift-locked');
+  }
+}
+
+// User-ID inputs are multi-value (comma-separated, dedup); user-single inputs
+// hold one ID (overwrite); message-ID inputs are single-value (overwrite).
+// Server and Channel captures are *additive* — they go through addPair() which
+// appends to the queue's grouped format and emits its own dedup/absorb/narrow logs.
+function insertCapturedId(input, label, id, type) {
+  if (type === 'user') {
+    const list = input.value.trim().split(/\s*,\s*/).filter(Boolean);
+    if (list.includes(id)) {
+      log.info(`${id} is already in ${label} — skipped.`);
+      return;
+    }
+    list.push(id);
+    input.value = list.join(',');
+    log.success(`Captured user ID ${id} → ${label}.`);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  } else if (type === 'user-single') {
+    const previous = input.value.trim();
+    if (previous === id) {
+      log.info(`${id} is already set in ${label} — no change.`);
+      return;
+    }
+    input.value = id;
+    if (previous) log.success(`Captured user ID ${id} → ${label} (overwrote ${previous}).`);
+    else          log.success(`Captured user ID ${id} → ${label}.`);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  } else if (type === 'server') {
+    log.success(`Captured server ID ${id} → adding to queue (server-wide).`);
+    addPair(id, ''); // addPair handles dedup/absorb logging
+  } else if (type === 'channel') {
+    const urlMatch = location.href.match(/channels\/(\w+)\/\d+/);
+    if (!urlMatch) {
+      return log.warn(`Captured channel ID ${id} but couldn't determine its parent server from the URL — open the channel in Discord first, then try again.`);
+    }
+    log.success(`Captured channel ID ${id} → adding to queue under server ${urlMatch[1]}.`);
+    addPair(urlMatch[1], id); // addPair handles dedup/narrow logging
+  } else {
+    input.value = id;
+    log.success(`Captured message ID ${id} → ${label}.`);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+}
+
+function bindSelector(buttonId, inputId, type, label) {
+  const button = $(`button#${buttonId}`);
+  const input = $(`input#${inputId}`);
+  button.onclick = () => startSelection(input, type, label, button);
+}
+
+// Binds a Clear button next to a text input — wipes the field and logs the action.
+// No-op (with a "already empty" log) when the input is already empty.
+// Special-case clears (Server clears Channel too, etc) are wired inline in initUI.
+function bindClearButton(buttonId, inputId, label) {
+  const button = $(`button#${buttonId}`);
+  const input = $(`input#${inputId}`);
+  button.onclick = () => {
+    if (!input.value.trim()) return log.info(`${label} is already empty.`);
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    log.info(`Cleared ${label}.`);
+  };
+}
+
+// ---- Multi-user-ID paste handling ----
+
+// On paste, if the clipboard contains one or more Discord user-ID snowflakes
+// (a single numeric ID, or a comma-separated list of them), append them to
+// the field's existing comma-separated list with deduplication. Lets the user
+// build a list by repeatedly right-click → Copy User ID → paste, instead of
+// having to manually type commas. Non-snowflake clipboards fall through to
+// native paste behavior.
+function bindMultiUserPaste(input, label) {
+  input.addEventListener('paste', (e) => {
+    const text = ((e.clipboardData || window.clipboardData).getData('text') || '').trim();
+    if (!/^\d{15,25}(\s*,\s*\d{15,25})*$/.test(text)) return; // not an ID list — let native paste run
+
+    e.preventDefault();
+    const incoming = text.split(/\s*,\s*/);
+    const list = input.value.trim().split(/\s*,\s*/).filter(Boolean);
+
+    let added = 0, dupes = 0;
+    for (const id of incoming) {
+      if (list.includes(id)) dupes++;
+      else { list.push(id); added++; }
+    }
+
+    input.value = list.join(',');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    if (added > 0) log.info(`Appended ${added} ID${added === 1 ? '' : 's'} to ${label}.`);
+    if (dupes > 0) log.info(`${dupes} ID${dupes === 1 ? ' was' : 's were'} already in ${label} — skipped.`);
+  });
+}
+
+// Single-value variant for fields that can only hold one user ID (Include @user —
+// Discord's `mentions=` query param accepts only one ID per request). New paste
+// overwrites the field. Non-snowflake clipboards fall through to native paste.
+function bindSingleUserPaste(input, label) {
+  input.addEventListener('paste', (e) => {
+    const text = ((e.clipboardData || window.clipboardData).getData('text') || '').trim();
+    if (!/^\d{15,25}$/.test(text)) return;
+
+    e.preventDefault();
+    const previous = input.value.trim();
+    if (previous === text) {
+      log.info(`${label}: ${text} is already set — no change.`);
+      return;
+    }
+    input.value = text;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    if (previous) log.info(`${label}: replaced ${previous} with ${text}.`);
+    else          log.info(`${label}: set to ${text}.`);
+  });
+}
+
 const LOG_MAX_ENTRIES = 1000; // trim oldest beyond this — prevents unbounded DOM growth on long wipes
 
+// Renders a single log entry into the in-panel log area. Wired in as the global
+// log sink (setLogFn) once initUI() has the DOM ready, so anything called via
+// `log.info()` / `log.error()` / etc from anywhere shows up here.
 function printLog(type = '', args) {
   // For Errors, force serialization of normally-non-enumerable props (message, stack, etc).
   const html = args.map(o => {
@@ -385,11 +1205,14 @@ function printLog(type = '', args) {
   if (type === 'error') console.error(LOG_PREFIX, ...args);
 }
 
+// Wires the core's lifecycle callbacks (onStart / onProgress / onStop) into UI updates:
+// disables/enables buttons, animates the trash FAB, and updates the progress bar.
 function bindCoreEvents() {
   undiscordCore.onStart = () => {
     $('#start').disabled = true;
     $('#stop').disabled = false;
     ui.undiscordBtn.classList.add('running');
+    if (ui.serverBarBtn) ui.serverBarBtn.classList.add('running');
     ui.progressMain.style.display = 'block';
     ui.percent.style.display = 'block';
   };
@@ -407,46 +1230,197 @@ function bindCoreEvents() {
       ui.progressMain.setAttribute('max', max);
       ui.progressIcon.value = value;
       ui.progressMain.value = value;
+      // Mirror progress onto the server-bar button too, if injected.
+      const srvProgress = ui.serverBarBtn && ui.serverBarBtn.querySelector('.udl-progress');
+      if (srvProgress) {
+        srvProgress.setAttribute('max', max);
+        srvProgress.value = value;
+      }
     } else {
       ui.percent.innerHTML = '...';
       ui.progressIcon.removeAttribute('value');
       ui.progressMain.removeAttribute('value');
     }
 
-    // Sync the slider to reflect any rate-limit bump/decay applied by core.
-    $('input#searchDelay').value = undiscordCore.options.searchDelay;
-    $('div#searchDelayValue').textContent = undiscordCore.options.searchDelay + 'ms';
-    $('input#deleteDelay').value = undiscordCore.options.deleteDelay;
-    $('div#deleteDelayValue').textContent = undiscordCore.options.deleteDelay + 'ms';
+    // Sync the stepper display to reflect any rate-limit bump/decay applied by core.
+    setDelayDisplay('searchDelay', undiscordCore.options.searchDelay);
+    setDelayDisplay('deleteDelay', undiscordCore.options.deleteDelay);
   };
 
   undiscordCore.onStop = () => {
     $('#start').disabled = false;
     $('#stop').disabled = true;
     ui.undiscordBtn.classList.remove('running');
+    if (ui.serverBarBtn) ui.serverBarBtn.classList.remove('running');
     ui.progressMain.style.display = 'none';
     ui.percent.style.display = 'none';
   };
 }
 
+// Pre-flight permission check for multi-author batching. Hits Discord's
+// /users/@me/guilds endpoint once, indexes guilds where the user has Manage
+// Messages or Administrator, and rejects any (server, non-self-author) pair
+// targeting a guild outside that index. DMs are skipped entirely (you only
+// have access to your own DM messages anyway). Returns true to proceed,
+// false to abort.
+async function checkBatchPermissions(jobs, authToken) {
+  const selfId = getAuthorId(); // user's own ID from localStorage; null if read fails
+  // Collect every (serverId → Set of non-self authors) we need to check.
+  const pairs = new Map();
+  for (const job of jobs) {
+    if (job.guildId === '@me') continue;            // DMs don't need this check
+    if (selfId && job.authorId === selfId) continue; // self-author = no perm needed
+    if (!pairs.has(job.guildId)) pairs.set(job.guildId, new Set());
+    pairs.get(job.guildId).add(job.authorId || '<any>');
+  }
+  if (pairs.size === 0) return true; // nothing to verify — self-only or DM-only run
+
+  log.info('Pre-flight: checking Manage Messages permission for non-self authors...');
+
+  let guilds;
+  try {
+    const resp = await fetch('https://discord.com/api/v9/users/@me/guilds', {
+      headers: { 'Authorization': authToken },
+    });
+    if (!resp.ok) {
+      log.error(`Pre-flight: couldn't fetch your guilds (status ${resp.status}). Aborting.`);
+      return false;
+    }
+    guilds = await resp.json();
+  } catch (err) {
+    log.error('Pre-flight: network error fetching guilds. Aborting.', err);
+    return false;
+  }
+
+  // Index guilds where the user has Manage Messages (0x2000) or Administrator (0x8).
+  const MANAGE_MESSAGES = 0x2000n;
+  const ADMINISTRATOR  = 0x8n;
+  const validServers = new Set();
+  for (const g of guilds) {
+    const perms = BigInt(g.permissions || '0');
+    if ((perms & ADMINISTRATOR) || (perms & MANAGE_MESSAGES)) validServers.add(g.id);
+  }
+
+  // Compare against queue. Aggregate failures by server so the user gets one
+  // line per problematic server with all the relevant authors listed.
+  const failures = [];
+  for (const [serverId, authors] of pairs) {
+    if (validServers.has(serverId)) continue;
+    failures.push({ serverId, authors: [...authors] });
+  }
+  if (failures.length === 0) {
+    log.info(`Pre-flight passed: you have Manage Messages on all ${pairs.size} server(s) targeted by non-self authors.`);
+    return true;
+  }
+
+  for (const f of failures) {
+    log.error(`You do not have permissions on Server id: ${f.serverId} to delete the messages of UserId('s): ${f.authors.join(', ')}`);
+  }
+  log.error('Run aborted by pre-flight permission check.');
+  return false;
+}
+
+// Click handler for the ▶︎ Delete button. Reads every form input, captures the
+// auth token, parses the queue, expands jobs across (target × author), runs a
+// pre-flight permission check, and dispatches to undiscordCore.run() (single
+// target+author) or undiscordCore.runBatch() (multiple jobs).
 async function startAction() {
   // general
   const authorId = $('input#authorId').value.trim();
-  const includeNsfw = $('input#includeNsfw').checked;
-  // filter
+  // filter — include
   const content = $('input#search').value.trim();
-  const hasLink = $('input#hasLink').checked;
-  const hasFile = $('input#hasFile').checked;
-  const includePinned = $('input#includePinned').checked;
+  const hasLink    = $('input#hasLink').checked;
+  const hasImage   = $('input#hasImage').checked;
+  const hasVideo   = $('input#hasVideo').checked;
+  const hasSound   = $('input#hasSound').checked;
+  const hasSticker = $('input#hasSticker').checked;
+  const hasPoll    = $('input#hasPoll').checked;
+  const hasEmbed   = $('input#hasEmbed').checked;
+  const hasForward = $('input#hasForward').checked;
+  const mentions = $('input#mentionsId').value.trim();
+  const mentionEveryone = $('input#mentionEveryone').checked;
+  const pinnedMode = $('select#pinnedMode').value;
+  // filter — exclude (applied client-side after the search response)
+  const excludeContent = $('input#excludeSearch').value.trim();
+  const excludeMatchMode = $('input#excludeMatchPill').checked ? 'substring' : 'exact';
+  const excludeLink    = $('input#excludeLink').checked;
+  const excludeImage   = $('input#excludeImage').checked;
+  const excludeVideo   = $('input#excludeVideo').checked;
+  const excludeSound   = $('input#excludeSound').checked;
+  const excludeSticker = $('input#excludeSticker').checked;
+  const excludePoll    = $('input#excludePoll').checked;
+  const excludeEmbed   = $('input#excludeEmbed').checked;
+  const excludeForward = $('input#excludeForward').checked;
+  const excludeMentions = $('input#excludeMentionsId').value.trim();
+  const excludeMentionEveryone = $('input#excludeMentionEveryone').checked;
   // message interval
   const minId = $('input#minId').value.trim();
   const maxId = $('input#maxId').value.trim();
   // date range
   const minDate = $('input#minDate').value.trim();
   const maxDate = $('input#maxDate').value.trim();
-  // advanced
-  const searchDelay = parseInt($('input#searchDelay').value.trim());
-  const deleteDelay = parseInt($('input#deleteDelay').value.trim());
+  // advanced (stepper-backed; raw ms lives in dataset)
+  const searchDelay = getDelayMs('searchDelay');
+  const deleteDelay = getDelayMs('deleteDelay');
+  const streamerMode = $('input#streamerMode').checked;
+
+  // ---- Validation ----
+
+  // Snowflake IDs must be numeric and form a valid range.
+  if (minId && !/^\d+$/.test(minId)) return log.error(`"After message ID" must be a numeric Discord ID, got: "${minId}"`);
+  if (maxId && !/^\d+$/.test(maxId)) return log.error(`"Before message ID" must be a numeric Discord ID, got: "${maxId}"`);
+  if (minId && maxId && BigInt(minId) >= BigInt(maxId)) {
+    return log.error('"After message ID" must be older (smaller snowflake) than "Before message ID".');
+  }
+
+  // Author IDs may be comma-separated (each one expands the batch). Validate numeric.
+  const authorList = authorId ? authorId.split(/\s*,\s*/).filter(Boolean) : [];
+  for (const a of authorList) {
+    if (!/^\d+$/.test(a)) return log.error(`Author ID list contains a non-numeric value: "${a}"`);
+  }
+  // Include @user is single-value — Discord's `mentions=` query param accepts only
+  // one ID per request, so multi-build doesn't help on this side. The paste/select
+  // helpers overwrite rather than append; reject if the user typed multiple manually.
+  if (mentions && !/^\d+$/.test(mentions)) {
+    return log.error(`"Include @user" must be a single numeric Discord ID. Multi-mention only works on the Skip side (Discord's search API can only filter to one mention at a time).`);
+  }
+  // Skip @user IS multi-value — applied client-side as a list check, so any number
+  // of mentioned users can be skipped from a single run.
+  const excludeMentionsList = excludeMentions ? excludeMentions.split(/\s*,\s*/).filter(Boolean) : [];
+  for (const m of excludeMentionsList) {
+    if (!/^\d+$/.test(m)) return log.error(`Skip mentions user ID list contains a non-numeric value: "${m}"`);
+  }
+
+  // Search-filter / Delete-filter overlap checks.
+  if (content && excludeContent && content.toLowerCase() === excludeContent.toLowerCase()) {
+    return log.error('Include text and Skip text are the same — nothing would match. Clear one.');
+  }
+  if (mentions && excludeMentionsList.includes(mentions)) {
+    return log.error(`Include @user (${mentions}) is also in Skip @user — nothing would match. Remove from one.`);
+  }
+
+  // Datetime validation. Date inputs are live-clamped to Discord's epoch via
+  // bindDateClamp() the moment the user commits a value, so by the time we get
+  // here, the only remaining work is parse-check, default-empty-min, range-check.
+  let minDateUsed = minDate;
+  const maxDateUsed = maxDate;
+  if (minDateUsed && Number.isNaN(new Date(minDateUsed).getTime())) {
+    return log.error('Invalid "After date" — please re-enter using the date picker.');
+  }
+  if (maxDateUsed && Number.isNaN(new Date(maxDateUsed).getTime())) {
+    return log.error('Invalid "Before date" — please re-enter using the date picker.');
+  }
+  if (!minDateUsed) minDateUsed = DISCORD_EPOCH_LOCAL;
+  const minDateMs = new Date(minDateUsed).getTime();
+  const maxDateMs = maxDateUsed ? new Date(maxDateUsed).getTime() : null;
+  if (maxDateMs !== null && minDateMs >= maxDateMs) {
+    return log.error('"After date" must be earlier than "Before date".');
+  }
+
+  // Warn if both intervals are set — the message-ID range wins, the date range is ignored.
+  if ((minId || maxId) && (minDate || maxDate)) {
+    log.warn('Both Message interval and Date interval are set — Message interval takes precedence.');
+  }
 
   // token (auto-fetched, no manual input)
   const authToken = fillToken();
@@ -457,37 +1431,81 @@ async function startAction() {
   if (!targets.length) return log.error('You must fill the "Server ID" field!');
   if (orphans) log.warn(`${orphans} channel entr${orphans === 1 ? 'y has' : 'ies have'} no server and will be skipped. Channels need a parent server.`);
 
-  // clear logArea
+  // Expand (target × author) into per-job entries. DMs are intentionally excluded
+  // from multi-author batching — Discord won't let you delete other users' DM
+  // messages, so DMs only ever spawn one job each (with the first author in the
+  // list, presumed to be self).
+  const jobs = [];
+  for (const t of targets) {
+    if (t.guildId === '@me') {
+      if (authorList.length > 1) {
+        log.warn(`DM ${t.channelId}: multi-author batching skipped — DMs only support self-author. Using first author (${authorList[0]}).`);
+      }
+      jobs.push({ ...t, authorId: authorList[0] || '' });
+    } else if (authorList.length > 1) {
+      for (const a of authorList) jobs.push({ ...t, authorId: a });
+    } else {
+      jobs.push({ ...t, authorId: authorList[0] || '' });
+    }
+  }
+
+  // Pre-flight permission check: any non-DM job with a non-self author needs
+  // Manage Messages or Administrator on its target server. One API call total.
+  const ok = await checkBatchPermissions(jobs, authToken);
+  if (!ok) return;
+
   ui.logArea.innerHTML = '';
 
   undiscordCore.resetState();
-  // Common options applied to every job. guildId/channelId are set per-job below.
+  // Common options applied to every job. guildId/channelId/authorId are set per-job below.
   undiscordCore.options = {
     ...undiscordCore.options,
     authToken,
     authorId,
-    minId: minId || minDate,
-    maxId: maxId || maxDate,
+    minId: minId || minDateUsed,
+    maxId: maxId || maxDateUsed,
     content,
     hasLink,
-    hasFile,
-    includeNsfw,
-    includePinned,
+    hasImage,
+    hasVideo,
+    hasSound,
+    hasSticker,
+    hasPoll,
+    hasEmbed,
+    hasForward,
+    mentions, // single ID (validated above)
+    mentionEveryone,
+    pinnedMode,
+    excludeContent,
+    excludeMatchMode,
+    excludeLink,
+    excludeImage,
+    excludeVideo,
+    excludeSound,
+    excludeSticker,
+    excludePoll,
+    excludeEmbed,
+    excludeForward,
+    excludeMentions, // comma-separated string; core parses into a list at filter time
+    excludeMentionEveryone,
     searchDelay,
     deleteDelay,
+    streamerMode,
   };
 
-  if (targets.length === 1) {
-    undiscordCore.options.guildId = targets[0].guildId;
-    undiscordCore.options.channelId = targets[0].channelId; // '' = server-wide
+  if (jobs.length === 1) {
+    undiscordCore.options.guildId  = jobs[0].guildId;
+    undiscordCore.options.channelId = jobs[0].channelId; // '' = server-wide
+    undiscordCore.options.authorId  = jobs[0].authorId;
     try { await undiscordCore.run(); }
     catch (err) { log.error('CoreException', err); undiscordCore.stop(); }
   } else {
-    try { await undiscordCore.runBatch(targets); }
+    try { await undiscordCore.runBatch(jobs); }
     catch (err) { log.error('CoreException', err); }
   }
 }
 
+// Click handler for the 🛑 Stop button. Forwards to core.stop().
 function stopAction() {
   undiscordCore.stop();
 }

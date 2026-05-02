@@ -1,15 +1,20 @@
-// Shared helpers — utility functions, DOM helpers, the log facade,
-// and Discord-specific extractors (token, IDs).
-
 // ---------- General utilities ----------
 
 export const msToHMS = s => `${s / 3.6e6 | 0}h ${(s % 3.6e6) / 6e4 | 0}m ${(s % 6e4) / 1000 | 0}s`;
 export const escapeHTML = html => String(html).replace(/[&<"']/g, m => ({ '&': '&amp;', '<': '&lt;', '"': '&quot;', '\'': '&#039;' })[m]);
 export const queryString = params => params.filter(p => p[1] !== undefined).map(p => p[0] + '=' + encodeURIComponent(p[1])).join('&');
-// Async wrapper around window.confirm. The 10ms setTimeout lets queued log writes
-// paint before the blocking modal pops. Returns true on OK, false on Cancel.
+// 10ms setTimeout lets queued log writes paint before the blocking modal pops.
 export const askYesNo = async msg => new Promise(resolve => setTimeout(() => resolve(window.confirm(msg)), 10));
-export const toSnowflake = (date) => /:/.test(date) ? ((new Date(date).getTime() - 1420070400000) * Math.pow(2, 22)) : date;
+// Convert a datetime-local string ("YYYY-MM-DDTHH:MM") to a Discord snowflake.
+// Plain numeric strings pass through unchanged (already a snowflake).
+// Negative offsets get clamped to 0 because Discord rejects negative snowflakes,
+// and datetime-local is interpreted in the user's local timezone — eastern offsets
+// can place "2015-01-01T00:00" before Discord's UTC epoch.
+export const toSnowflake = (date) => {
+  if (!/:/.test(date)) return date;
+  const offset = new Date(date).getTime() - 1420070400000;
+  return Math.max(0, offset) * Math.pow(2, 22);
+};
 
 // ---------- DOM helpers ----------
 
@@ -42,8 +47,7 @@ export const log = {
 // ---------- Discord ID / token extractors ----------
 
 // Discord blocks direct localStorage access from the page; an iframe inherits
-// the parent origin's storage and is the standard workaround. The iframe is
-// removed after the read so we don't accumulate orphan nodes.
+// the parent origin's storage and is the standard workaround.
 function withIframeLocalStorage(read) {
   const f = document.body.appendChild(document.createElement('iframe'));
   try { return read(f.contentWindow.localStorage); }
@@ -52,15 +56,12 @@ function withIframeLocalStorage(read) {
 
 const CHANNEL_URL_RE = /channels\/([\w@]+)\/(\d+)/;
 
+// Reads the Discord auth token from the same localStorage entry Discord's own
+// client uses. The beforeunload dispatch nudges Discord to flush its in-memory
+// token cache to localStorage first; without it, a fresh tab may show an empty key.
 export function getToken() {
   window.dispatchEvent(new Event('beforeunload'));
-  try {
-    return withIframeLocalStorage(ls => JSON.parse(ls.token));
-  } catch {
-    log.info('Could not automatically detect Authorization Token in local storage!');
-    log.info('Attempting to grab token using webpack');
-    return (window.webpackChunkdiscord_app.push([[''], {}, e => { window.m = []; for (let c in e.c) window.m.push(e.c[c]); }]), window.m).find(m => m?.exports?.default?.getToken !== void 0).exports.default.getToken();
-  }
+  return withIframeLocalStorage(ls => JSON.parse(ls.token));
 }
 
 export function getAuthorId() {
