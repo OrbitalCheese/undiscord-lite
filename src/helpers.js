@@ -61,7 +61,12 @@ function withIframeLocalStorage(read) {
   finally { f.remove(); }
 }
 
-const CHANNEL_URL_RE = /channels\/([\w@]+)\/(\d+)/;
+// Discord URL shapes the script reads from:
+//   /channels/<guildId>/<channelId>  — inside a guild text/voice channel
+//   /channels/@me/<channelId>        — inside an open DM or group DM
+//   /channels/@me                    — friends tab (DM list, no channel selected)
+// The channel segment is optional so getGuildId() resolves "@me" on the friends tab.
+const CHANNEL_URL_RE = /channels\/([\w@]+)(?:\/(\d+))?/;
 
 // Reads the Discord auth token from the same localStorage entry Discord's own
 // client uses. The beforeunload dispatch nudges Discord to flush its in-memory
@@ -84,7 +89,7 @@ export function getGuildId() {
 
 export function getChannelId() {
   const m = location.href.match(CHANNEL_URL_RE);
-  if (m) return m[2];
+  if (m && m[2]) return m[2];
   alert('Could not find the Channel ID!\nPlease make sure you are on a Channel or DM.');
   return null;
 }

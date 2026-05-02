@@ -3,8 +3,22 @@
   "nameFull": "Undiscord Lite",
   "version": "1.0.0",
   "description": "Bulk-delete Discord messages. Zero-dependency personal fork of Undiscord with multi-server batching.",
+  "author": "OrbitalCheese",
+  "license": "MIT",
+  "homepage": "https://github.com/OrbitalCheese/undiscord-lite",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OrbitalCheese/undiscord-lite.git"
+  },
+  "bugs": {
+    "url": "https://github.com/OrbitalCheese/undiscord-lite/issues"
+  },
   "userScript": {
     "namespace": "https://github.com/OrbitalCheese/undiscord-lite",
+    "author": "OrbitalCheese",
+    "license": "MIT",
+    "homepageURL": "https://github.com/OrbitalCheese/undiscord-lite",
+    "supportURL": "https://github.com/OrbitalCheese/undiscord-lite/issues",
     "match": [
       "https://*.discord.com/app",
       "https://*.discord.com/channels/*"
@@ -13,7 +27,6 @@
     "downloadURL": "https://raw.githubusercontent.com/OrbitalCheese/undiscord-lite/master/undiscord-lite.user.js",
     "updateURL": "https://raw.githubusercontent.com/OrbitalCheese/undiscord-lite/master/undiscord-lite.user.js"
   },
-  "license": "MIT",
   "engines": {
     "node": ">=18"
   },

@@ -20,7 +20,6 @@
         <div class="sidebar scroll">
             <div id="sidebarActions">
                 <button id="start" class="danger" title="Start the deletion process">▶︎ Delete</button>
-                <button id="stop" title="Stop the deletion process" disabled>🛑 Stop</button>
                 <button id="clear" title="Clear the log area">Clear Log</button>
             </div>
             <div id="sidebarBadgeRow">
@@ -40,8 +39,11 @@
                         <button id="getAuthor">Me</button>
                         <button id="selectAuthor" title="Click, then click a user or message in Discord to capture their User ID. Hold Shift to capture multiple in a row.">Select</button>
                     </div>
-                    <div class="sectionDescription tips" style="margin-top: 4px;">
-                        <div>› TIP: Hold down Shift to select multiple things in a row!</div>
+                    <div class="sectionDescription" style="margin-top: 6px;">
+                        <label class="row" style="margin-bottom: 0;" title="Toggle whether age-gated NSFW channels are queried by Discord's search API. Default: excluded.">
+                            <input id="includeNsfw" type="checkbox">
+                            <span id="includeNsfwLabel">Exclude NSFW channels</span>
+                        </label>
                     </div>
                 </fieldset>
                 <hr>
@@ -53,9 +55,9 @@
                         <button class="clear-btn" id="clearGuild" title="Clear Server (also clears Channel)">Clear</button>
                     </div>
                     <div class="input-actions">
+                        <button id="addGuild" title="Queue the server you're currently viewing for a server-wide wipe.">Add</button>
+                        <button id="delGuild" title="Remove the server you're currently viewing from the queue.">Delete</button>
                         <button id="selectGuild" title="Click, then click a server icon in Discord to capture its ID">Select</button>
-                        <button id="addGuild">Add</button>
-                        <button id="delGuild">Delete</button>
                     </div>
                 </fieldset>
                 <fieldset>
@@ -66,9 +68,9 @@
                         <button class="clear-btn" id="clearChannel" title="Clear Channel only">Clear</button>
                     </div>
                     <div class="input-actions">
+                        <button id="addChannel" title="Queue the channel you're currently viewing.">Add</button>
+                        <button id="delChannel" title="Remove the channel you're currently viewing from the queue.">Delete</button>
                         <button id="selectChannel" title="Click, then click a channel or message in Discord to capture its ID">Select</button>
-                        <button id="addChannel">Add</button>
-                        <button id="delChannel">Delete</button>
                     </div>
                 </fieldset>
                 <fieldset>
@@ -89,7 +91,7 @@
                 <summary>Import data export<button class="help-btn" data-help="importExport" title="Show help for Import data export">Help</button></summary>
                 <fieldset>
                     <legend>Import folder</legend>
-                    <button class="help-btn" data-help="importExport" title="Show help for Import data export">Help</button>
+                    <button class="help-btn" data-help="importFolder" title="Show help for picking the import folder">Help</button>
                     <input id="importPicker" type="file" webkitdirectory directory multiple style="display:none;">
                     <div class="input-actions">
                         <button id="importPick" title="Pick the unzipped 'messages/' folder of your Discord data export">Select Folder...</button>
@@ -244,8 +246,8 @@
                     <div class="stepper">
                         <input id="searchDelay" type="text" title="Click to type a value (auto-clamps to 15000–60000 ms)">
                         <button id="searchDelayDown" class="stepper-down" title="−500 ms">&lt;</button>
-                        <button id="searchDelayReset" class="stepper-reset" title="Reset to default">↺</button>
                         <button id="searchDelayUp" class="stepper-up" title="+500 ms">&gt;</button>
+                        <button id="searchDelayReset" class="stepper-reset" title="Reset to default">↺</button>
                     </div>
                 </fieldset>
                 <fieldset>
@@ -254,8 +256,8 @@
                     <div class="stepper">
                         <input id="deleteDelay" type="text" title="Click to type a value (auto-clamps to 100–3000 ms)">
                         <button id="deleteDelayDown" class="stepper-down" title="−50 ms">&lt;</button>
-                        <button id="deleteDelayReset" class="stepper-reset" title="Reset to default">↺</button>
                         <button id="deleteDelayUp" class="stepper-up" title="+50 ms">&gt;</button>
+                        <button id="deleteDelayReset" class="stepper-reset" title="Reset to default">↺</button>
                     </div>
                 </fieldset>
             </details>

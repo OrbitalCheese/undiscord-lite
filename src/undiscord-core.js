@@ -79,6 +79,7 @@ class UndiscordCore {
     excludeForward: null, // post-search filter: drop forwarded messages
     excludeMentions: null,        // post-search filter: drop messages @mentioning ANY of these user IDs (comma-separated)
     excludeMentionEveryone: null, // post-search filter: drop messages with @everyone / @here
+    includeNsfw: false, // server-side: when true, age-gated NSFW channels are included in search results; when false (default), Discord excludes them
     searchDelay: null,
     deleteDelay: null,
     maxEmptyPageRetries: 5, // re-fetch this many times when grandTotal says more remain but the page is empty
@@ -214,7 +215,7 @@ class UndiscordCore {
       log.verb(`Messages in current page: ${this.state._searchResponse.messages.length}`);
       log.verb(`To be deleted: ${this.state._messagesToDelete.length}`);
       log.verb(`Skipped: ${this.state._skippedMessages.length}`);
-      log.verb(`offset: ${this.state.offset}`);
+      log.verb(`Offset: ${this.state.offset}`);
       this.printStats();
 
       this.calcEtr();
@@ -439,10 +440,11 @@ class UndiscordCore {
           this.options.pinnedMode === 'only'    ? true  :
           this.options.pinnedMode === 'exclude' ? false : undefined],
         ['content', this.options.content || undefined],
-        // Always include NSFW channels — the flag is permissive (whitelists NSFW results),
-        // not restrictive, so SFW channels return normally either way. Omitting it would
-        // silently zero-result any age-gated channel in the queue.
-        ['include_nsfw', true],
+        // include_nsfw is a permissive flag — when true, age-gated channels return
+        // results alongside SFW ones (SFW channels are unaffected either way).
+        // Omitting it (or sending false) means Discord silently zero-results any
+        // NSFW channel in the queue. User-controlled via the NSFW pill.
+        ['include_nsfw', this.options.includeNsfw ? true : undefined],
       ]), {
         headers: { 'Authorization': this.options.authToken }
       });
@@ -770,8 +772,8 @@ class UndiscordCore {
 
   printStats() {
     log.verb(`Delete delay: ${this.options.deleteDelay}ms, Search delay: ${this.options.searchDelay}ms`);
-    log.verb(`Last Ping: ${this.stats.lastPing}ms, Average Ping: ${this.stats.avgPing | 0}ms`);
-    log.verb(`Rate Limited: ${this.stats.throttledCount} times.`);
+    log.verb(`Last ping: ${this.stats.lastPing}ms, Average ping: ${this.stats.avgPing | 0}ms`);
+    log.verb(`Rate limited: ${this.stats.throttledCount} times.`);
     log.verb(`Total time throttled: ${msToHMS(this.stats.throttledTotalTime)}.`);
   }
 }

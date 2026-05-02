@@ -42,6 +42,11 @@ const $ = s => ui.undiscordWindow.querySelector(s);
 // Search filter / Delete filter UI sections grey out (CSS via .import-mode).
 let importedSet = null;
 
+// One-shot log message to print right after the "Started at..." line. Used by
+// startAction to surface notices that would otherwise be wiped by the log-clear
+// it does just before kicking off the run. Consumed (and cleared) by onStart.
+let pendingStartNotice = null;
+
 // Channel input uses ';' to separate per-server groups, ',' between channels in a group.
 // e.g. server="X,Y" + channel="C1,C2;C3" → X gets C1+C2, Y gets C3.
 // An empty group (";", or "C1;") means server-wide wipe of that server.
@@ -190,6 +195,22 @@ function removeServer(server) {
   writeQueue(servers, groups);
 }
 
+// Sanitizer: drops @me from the queue if it has no DM channels attached. That
+// state is only reachable by clearing the channel field while @me was still in
+// the server list, or by typing @me into the server input by hand. Either way
+// the result is an unrunnable phantom (server-wide @me has no valid Discord
+// search endpoint), so we evict it as soon as it appears.
+function cleanupOrphanedMe() {
+  const { servers, groups } = readQueue($('input#guildId').value, $('input#channelId').value);
+  const idx = servers.indexOf('@me');
+  if (idx === -1) return;            // no @me — nothing to do
+  if (groups[idx].length > 0) return; // @me still has DM channels — keep it
+  servers.splice(idx, 1);
+  groups.splice(idx, 1);
+  log.warn('Dropped @me from the queue — server-wide @me isn\'t a valid wipe target. Use "Add DM\'s" or capture specific DMs with Select on Channel instead.');
+  writeQueue(servers, groups);
+}
+
 // Remove a single (server, channel) pair from the queue. If the server has no channels
 // left after removal, the server is dropped too — there is no auto-conversion to server-wide.
 function removeChannel(server, channel) {
@@ -210,9 +231,19 @@ function removeChannel(server, channel) {
   }
   groups[idx].splice(cIdx, 1);
   if (groups[idx].length === 0) {
-    // Empty group means server-wide. Mirrors the opposite direction (Add Channel
-    // over a server-wide narrows it down) so removing the last channel widens it back out.
-    log.info(`Removed ${server}:${channel} — last channel, server converted to server-wide wipe.`);
+    if (server === '@me') {
+      // Special case: a server-wide entry of @me isn't a runnable target (the
+      // search endpoint requires a specific channel ID for DMs — same reason
+      // Add Server on @me is blocked). Drop the @me entry entirely instead of
+      // leaving it as a phantom server-wide that would error at run time.
+      servers.splice(idx, 1);
+      groups.splice(idx, 1);
+      log.info(`Removed ${server}:${channel} — last DM in the queue, dropping @me entirely (server-wide @me isn't a valid wipe target).`);
+    } else {
+      // Empty group means server-wide. Mirrors the opposite direction (Add Channel
+      // over a server-wide narrows it down) so removing the last channel widens it back out.
+      log.info(`Removed ${server}:${channel} — last channel, server converted to server-wide wipe.`);
+    }
   } else {
     log.info(`Removed ${server}:${channel} from the batch.`);
   }
@@ -396,8 +427,13 @@ function initUI() {
   ui.topBarSlot = $('#topBarSlot');
 
   $('#hide').onclick = toggleWindow;
-  $('button#start').onclick = startAction;
-  $('button#stop').onclick = stopAction;
+  // The primary button is dual-purpose: Delete when idle, Stop when a run is
+  // in flight. State is keyed off core's running flag so a single click handler
+  // dispatches to the right path; bindCoreEvents flips the label/title in sync.
+  $('button#start').onclick = () => {
+    if (undiscordCore.state.running) stopAction();
+    else startAction();
+  };
   $('button#clear').onclick = () => ui.logArea.innerHTML = '';
   $('button#getAuthor').onclick = () => {
     const id = getAuthorId();
@@ -406,7 +442,16 @@ function initUI() {
   // Add Server queues (currentServer, '') as a server-wide wipe; the current
   // server is read from Discord's URL. Point-and-click capture for the same
   // input lives below under the Select bindings.
-  $('button#addGuild').onclick = () => addPair(getGuildId(), '');
+  // @me is rejected here: the search endpoint requires a specific channel ID
+  // for DMs, so a server-wide entry of @me would create an unrunnable job.
+  // Use "Add DM's" in the DMs section instead — it queues each DM individually.
+  $('button#addGuild').onclick = () => {
+    const server = getGuildId();
+    if (server === '@me') {
+      return log.warn('"Add" on Server doesn\'t apply to the DM list — use "Add DM\'s" in the DMs section to queue all currently-open DMs.');
+    }
+    if (server) addPair(server, '');
+  };
   // Add Channel queues (currentServer, currentChannel) as a specific-channel entry.
   $('button#addChannel').onclick = () => {
     const server = getGuildId();
@@ -471,9 +516,15 @@ function initUI() {
     writeQueue(servers, groups);
   };
 
-  // Live-update the queue counter when the user manually edits either input.
+  // Live-update the queue counter as the user types, then sanitize on commit
+  // (blur after edit). The sanitize step strips orphaned @me so neither manual
+  // edits nor channel-field deletions can leave it as an unrunnable phantom.
+  // 'input' fires on every keystroke (cheap render); 'change' fires once per
+  // committed edit (so we don't fight the user mid-typing).
   $('input#guildId').addEventListener('input', renderQueue);
   $('input#channelId').addEventListener('input', renderQueue);
+  $('input#guildId').addEventListener('change', cleanupOrphanedMe);
+  $('input#channelId').addEventListener('change', cleanupOrphanedMe);
   renderQueue();
 
   // Import data export — folder picker, summary, clear button.
@@ -529,13 +580,16 @@ function initUI() {
     log.info('Cleared Server and Channel fields.');
     renderQueue();
   };
-  // Channel clear leaves Server intact.
+  // Channel clear leaves Server intact — except for @me, which gets dropped
+  // (an @me entry with no DM channels is unrunnable, so it can't be allowed
+  // to linger after the channels that were paired with it disappear).
   $('button#clearChannel').onclick = () => {
     const c = $('input#channelId');
     if (!c.value.trim()) return log.info('Channel field is already empty.');
     c.value = '';
     log.info('Cleared Channel field.');
     renderQueue();
+    cleanupOrphanedMe();
   };
 
   // Date interval shortcuts. 1 day / 1 week set min=now−Δ, max=now. "all" resets
@@ -558,6 +612,26 @@ function initUI() {
   $('input#includeGroupDms').addEventListener('change', (e) => {
     $('#includeGroupDmsLabel').textContent = e.target.checked ? "Including all group DM's" : "Skipping all group DM's";
   });
+
+  // NSFW pill: red (unchecked, default) = exclude age-gated channels from the
+  // search; green (checked) = include them. Affects the include_nsfw query
+  // param Discord's search API uses to gate NSFW results.
+  $('input#includeNsfw').addEventListener('change', (e) => {
+    $('#includeNsfwLabel').textContent = e.target.checked ? 'Include NSFW channels' : 'Exclude NSFW channels';
+  });
+
+  // Streamer mode: drives two separate effects.
+  //   1. CSS — toggling .streamer-on on the panel root dots out every ID-bearing
+  //      input field (see the .streamer-on rules in styles.css). Text-content
+  //      filter inputs stay readable.
+  //   2. Run-time — the streamerMode option is read by core in promptConfirmation
+  //      and the per-delete log line; both redact the message body and author.
+  // Sync the panel class to the checkbox's initial state, then track changes.
+  const syncStreamerClass = () => {
+    ui.undiscordWindow.classList.toggle('streamer-on', $('input#streamerMode').checked);
+  };
+  $('input#streamerMode').addEventListener('change', syncStreamerClass);
+  syncStreamerClass();
 
   // Help-button delegation: every <button class="help-btn" data-help="<key>"> in the
   // panel routes to the matching HELP_TEXT entry. preventDefault stops the click
@@ -707,6 +781,7 @@ const HELP_TEXT = {
       "To chain multiple people, comma-separate the IDs: <code>id1,id2,id3</code>. The run expands to one job per (target × author).",
       "Non-self authors require <i>Manage Messages</i> permission on their target server. A pre-flight check runs once at the top of the batch and aborts early if any pair lacks it.",
       "DMs are excluded from multi-author batching — Discord only lets you delete your own DM messages, so each DM target spawns one self-author job regardless of how many IDs are in the list.",
+      "<b>NSFW pill</b> (red/off &rarr; green/on): controls Discord's <code>include_nsfw</code> search flag. Default off means age-gated channels return zero results from the search API. Flip it on to include them.",
     ],
   },
   serverId: {
@@ -836,6 +911,17 @@ const HELP_TEXT = {
       "Click <b>↺</b> to reset to default.",
     ],
   },
+  importFolder: {
+    name: 'Import folder',
+    lines: [
+      "<b>What to pick:</b> the <code>messages/</code> folder inside your unzipped Discord data export — the folder that contains the per-channel <code>c&lt;ID&gt;/</code> subfolders and the top-level <code>index.json</code>. Pick the parent folder, NOT a single channel folder.",
+      "<b>Click <b>Select Folder...</b></b> to open the OS folder picker. Your browser will warn that the site is about to read every file in the folder — that's the standard <code>webkitdirectory</code> consent prompt; nothing is uploaded, files are read locally via the browser's File API.",
+      "<b>After selection</b>: the parser walks every <code>c&lt;ID&gt;/messages.json</code> in the tree, reads the per-channel <code>channel.json</code> for guild / DM metadata, then prints a summary line plus a per-source breakdown into the log. The status line above the log flips to <i>import mode</i>.",
+      "<b>Click <b>Clear Import</b></b> to drop the loaded set from memory and return to live-search mode. Picking a different folder afterwards loads it fresh — there's no need to clear first if you just want to swap exports.",
+      "<b>If your browser doesn't support folder picking</b> (rare on desktop): the picker has <code>multiple</code> too, so Ctrl+A inside the unzipped <code>messages/</code> folder and pick all files as a flat batch. The parser groups them by parent folder name, so the result is identical.",
+      "<b>Picking the wrong folder</b> (e.g. the top-level export folder instead of <code>messages/</code>) errors out with \"No c&lt;channelId&gt;/ folders found.\" — the parser refuses to half-import.",
+    ],
+  },
   importExport: {
     name: 'Import data export',
     lines: [
@@ -963,17 +1049,29 @@ function extractServerId(elem) {
     const m = item.getAttribute('data-list-item-id').match(/guildsnav___(\d+)/);
     if (m) return m[1];
   }
-  const urlMatch = location.href.match(/channels\/(\w+)\/\d+/);
+  // [\w@] so DM URLs like /channels/@me/<id> resolve to "@me", and the channel
+  // segment is optional so the friends-tab URL /channels/@me matches too.
+  const urlMatch = location.href.match(/channels\/([\w@]+)(?:\/\d+)?/);
   return urlMatch ? urlMatch[1] : null;
 }
 
-// Extracts a channel ID. Tries (in order) a channel-list item attribute, the
-// chat-messages wrapper's encoded channel, and finally the URL of the
-// currently-viewed channel.
+// Extracts a channel ID. Tries (in order):
+//   1. a server-channel sidebar item's data-list-item-id attribute
+//   2. a wrapping anchor whose href points at /channels/@me/<id> — this catches
+//      DM list items in the friends tab and in expanded DM categories elsewhere
+//   3. the chat-messages wrapper of an open message in the active channel
+//   4. the URL of the currently-viewed channel
 function extractChannelId(elem) {
   const item = elem.closest && elem.closest('[data-list-item-id^="channels___"]');
   if (item) {
     const m = item.getAttribute('data-list-item-id').match(/channels___(\d+)/);
+    if (m) return m[1];
+  }
+  // DM sidebar item: anchor href is the most stable identifier across Discord
+  // versions (data-list-item-id naming for DMs has churned more than href has).
+  const dmLink = elem.closest && elem.closest('[href*="/channels/@me/"]');
+  if (dmLink) {
+    const m = (dmLink.getAttribute('href') || '').match(/\/channels\/@me\/(\d+)/);
     if (m) return m[1];
   }
   const msg = elem.closest && elem.closest('[id^="chat-messages-"]');
@@ -981,7 +1079,8 @@ function extractChannelId(elem) {
     const m = msg.id.match(/chat-messages-(\d+)-\d+/);
     if (m) return m[1];
   }
-  const urlMatch = location.href.match(/channels\/\w+\/(\d+)/);
+  // [\w@] (not just \w) so that DM URLs like /channels/@me/<id> still match here.
+  const urlMatch = location.href.match(/channels\/[\w@]+\/(\d+)/);
   return urlMatch ? urlMatch[1] : null;
 }
 
@@ -1162,15 +1261,35 @@ function insertCapturedId(input, label, id, type) {
     else          log.success(`Captured user ID ${id} → ${label}.`);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   } else if (type === 'server') {
+    // @me isn't a runnable server-wide target (the search endpoint requires a
+    // specific channel ID for DMs). Same guard as the Add Server button uses.
+    if (id === '@me') {
+      return log.warn('"Select" on Server captured @me, but server-wide @me isn\'t a valid wipe target — use "Add DM\'s" in the DMs section, or "Select" on Channel for a specific DM.');
+    }
     log.success(`Captured server ID ${id} → adding to queue (server-wide).`);
     addPair(id, ''); // addPair handles dedup/absorb logging
   } else if (type === 'channel') {
-    const urlMatch = location.href.match(/channels\/(\w+)\/\d+/);
-    if (!urlMatch) {
-      return log.warn(`Captured channel ID ${id} but couldn't determine its parent server from the URL — open the channel in Discord first, then try again.`);
+    // Determine the parent server. Three URL shapes the user might be on:
+    //   /channels/<guildId>/<channelId>  — inside a guild channel
+    //   /channels/@me/<channelId>        — inside an open DM
+    //   /channels/@me                    — friends tab (DM list, no open convo)
+    // The first two are handled by the main regex; the third is handled by the
+    // fallback so DMs picked from the friends-tab list still resolve to @me.
+    let parentServer = null;
+    const urlMatch = location.href.match(/channels\/([\w@]+)\/\d+/);
+    if (urlMatch) {
+      parentServer = urlMatch[1];
+    } else if (/\/channels\/@me\b/.test(location.href)) {
+      parentServer = '@me';
+    } else {
+      return log.warn(`Captured channel ID ${id} but couldn't determine its parent server from the URL — open the channel (or its parent server) in Discord first, then try again.`);
     }
-    log.success(`Captured channel ID ${id} → adding to queue under server ${urlMatch[1]}.`);
-    addPair(urlMatch[1], id); // addPair handles dedup/narrow logging
+    if (parentServer === '@me') {
+      log.success(`Captured DM channel ID ${id} → adding to queue.`);
+    } else {
+      log.success(`Captured channel ID ${id} → adding to queue under server ${parentServer}.`);
+    }
+    addPair(parentServer, id); // addPair handles dedup/narrow logging
   } else {
     input.value = id;
     log.success(`Captured message ID ${id} → ${label}.`);
@@ -1268,18 +1387,27 @@ function printLog(type = '', args) {
 }
 
 // Wires the core's lifecycle callbacks (onStart / onProgress / onStop) into UI
-// updates: disables/enables the action buttons, flips the trash icon (FAB and
-// server-bar variant) into its red/active running state, updates the visual
-// progress bar, and writes the live progress text into the top-bar slot.
+// updates: morphs the primary action button between Delete (idle) and Stop
+// (running), flips the trash icon (FAB and server-bar variant) into its
+// red/active running state, updates the visual progress bar, and writes the
+// live progress text into the top-bar slot.
 function bindCoreEvents() {
   undiscordCore.onStart = () => {
-    $('#start').disabled = true;
-    $('#stop').disabled = false;
+    const btn = $('button#start');
+    btn.textContent = '🛑 Stop';
+    btn.title = 'Stop the deletion process';
     ui.undiscordBtn.classList.add('running');
     if (ui.serverBarBtn) ui.serverBarBtn.classList.add('running');
     ui.progressMain.style.display = 'block';
     // Initial running-state text — onProgress overwrites once we have numbers.
     ui.topBarSlot.innerHTML = `<span class="status-line status-running">Starting…</span>`;
+    // Drain any one-shot notice startAction stashed (logged here so it lands
+    // right after the "Started at..." line instead of getting wiped by the
+    // log-clear that runs between startAction and run()).
+    if (pendingStartNotice) {
+      log.info(pendingStartNotice);
+      pendingStartNotice = null;
+    }
   };
 
   undiscordCore.onProgress = (state, stats) => {
@@ -1313,8 +1441,9 @@ function bindCoreEvents() {
   };
 
   undiscordCore.onStop = () => {
-    $('#start').disabled = false;
-    $('#stop').disabled = true;
+    const btn = $('button#start');
+    btn.textContent = '▶︎ Delete';
+    btn.title = 'Start the deletion process';
     ui.undiscordBtn.classList.remove('running');
     if (ui.serverBarBtn) ui.serverBarBtn.classList.remove('running');
     ui.progressMain.style.display = 'none';
@@ -1549,8 +1678,26 @@ async function startImportAction() {
 // Routes to startImportAction() when an export has been imported.
 async function startAction() {
   if (importedSet) return startImportAction();
+
+  // Edge case: empty Author ID. Fill the UI field with your own ID so the rest
+  // of startAction sees a populated input — keeps the normal flow uniform and
+  // the UI reflects what the run is actually doing. The notice itself is
+  // deferred to onStart so it lands AFTER the "Started at..." line (the log
+  // gets cleared between here and run() starting). Streamer mode redacts the
+  // ID in the log line — the input itself is already dotted out via CSS.
+  const authorInput = $('input#authorId');
+  if (!authorInput.value.trim()) {
+    const selfId = getAuthorId();
+    if (selfId) {
+      authorInput.value = selfId;
+      const shown = $('input#streamerMode').checked ? '••••' : selfId;
+      pendingStartNotice = `Author ID was empty — defaulting to your own user ID (${shown}).`;
+    }
+  }
+
   // general
-  const authorId = $('input#authorId').value.trim();
+  const authorId = authorInput.value.trim();
+  const includeNsfw = $('input#includeNsfw').checked;
   // filter — include
   const content = $('input#search').value.trim();
   const hasLink    = $('input#hasLink').checked;
@@ -1686,6 +1833,7 @@ async function startAction() {
     ...undiscordCore.options,
     authToken,
     authorId,
+    includeNsfw,
     importSource: null, // defensive — make sure a stale import source from a prior run doesn't leak in
     minId: minId || minDateUsed,
     maxId: maxId || maxDateUsed,

@@ -2,11 +2,27 @@
 
 Bulk-delete your messages in Discord servers, channels, and DMs. A zero-dependency rewrite of [victornpb/undiscord](https://github.com/victornpb/undiscord).
 
-## What's new
+## Preface
 
-- **Zero npm dependencies.** The build is a single ~250-line Node script — no rollup, no plugins, no `node_modules`. The bundled userscript runs with no external dependencies, so there's nothing to audit beyond the file itself.
+This project is an extensive rewrite of the Undiscord project by victornpb originally made for my own personal use, now graciously expanded to bless anyone ~~dumb~~ brave enough to download it. 
 
-- **Multi-server / multi-channel batching** with `Add` / `Select` / `Delete` controls and a live queue display. The original technically supported batching — comma-separated channel IDs in one input — but it was undocumented and miserable to use manually. Dedicated buttons and a smarter queue let you mix entire-server wipes with channel-specific entries however you want.
+The original lacked some serious core functionalities, polish, and was way too bloated and reliant on like a dozen node modules. This version is about 45x lighter and uses exactly ZERO. Everything is built in-house, and there is nothing to audit outside of what's in the repo. Nothing is obscured or imported, everything is auditable directly.  
+
+⚠️ DON'T TRUST RANDOM CODE FROM THE INTERNET WITHOUT UNDERSTANDING WHAT IT DOES AND HOW IT DOES IT! ⚠️
+
+This impotus was the main reason for my own rewrite. 12+ dependencies, was far too much obfuscation for my taste. I didn't trust undiscord so I ripped it to atoms and reconstructed a version that I built, verified, and can PERSONALLY 100% trust.
+
+You aren't me, so you should be ⚠️*very*⚠️ wary of claims made by me. 
+I lied to people before, and I will do it again. For I am but a man. Don't blindly trust anyone online. 
+
+That being said I tried my best to be as transparent as possible. 
+(Which could also be a lie to lull you into a false sense of security.)
+
+## Features
+
+- **Zero npm dependencies.** The build is a single ~250-line Node script — no rollup, no plugins, no `node_modules`. The bundled userscript runs with no external dependencies, so there's nothing to audit beyond the file itself. Size went down from ~7mb to ~200kb. 
+
+- **Multi-server / multi-channel batching** with `Add` / `Select` / `Delete` controls and a live queue display. The original technically supported batching — comma-separated channel IDs in one input for channels only— but it was basically undocumented and miserable to use manually. Dedicated buttons and a smarter queue let you mix entire-server wipes with channel-specific entries however you want.
 
 - **Point-and-click ID capture.** Hit `Select` on any field, then click an avatar / message / server icon / channel in Discord — the relevant ID drops into the field. Hold Shift to capture several in a row. Faster than Developer Mode + Copy ID for everything except cross-server lookups.
 
@@ -14,13 +30,22 @@ Bulk-delete your messages in Discord servers, channels, and DMs. A zero-dependen
 
 - **Robust rate-limit handling** — monotonic delay bumps with half-life decay back to your chosen baseline. The original bumped the delay on a 429 and never reset it, leaving you crawling for the rest of the run. Now it decays back toward your stepper value as deletes succeed.
 
-- **Auto-retry** on HTTP 5xx, network errors, and Discord's transient empty-page quirks. The original would die on a single empty page, an internet hiccup, or any Discord wobble. Each of those now has proper retry logic.
+- **Auto-retry** on HTTP 5xx, network errors, and Discord's transient empty-page quirks. The original would die on a single empty page, an internet hiccup, or any Discord wobble. Each of those now has proper retry logic. Thank the Lord. 
 
-- **Server-bar trash-icon injection** + `Ctrl+Shift+D` shortcut. The icon mounts inside Discord's left rail (between the Home/DM separator and the first server) and re-injects every second if React drops it. A floating action button in the bottom-right is the fallback when Discord's DOM doesn't expose the expected anchors.
+- **Robust user-flow handling** The entire thing has been monkey-proofed as much as possible. Invalid inputs are clamped, invalid dates get restored, user permissions are checked before trying to delete other people's messages, text-boxes autoformat the inputs properly, and everything has a hover title and an in-window help button that prints help to the log instead of redirecting to the github. 
+
+- **Server-bar trash-icon injection** + `Ctrl+Shift+D` shortcut. The icon mounts inside Discord's left rail (between the Home/DM separator and the first server) and re-injects every second if React drops it. A floating action button in the bottom-right is the fallback when Discord's DOM doesn't expose the expected anchors. And if all that fails, Ctrl+Shift+D will always toggle the window so you're never soft-locked out by a UI problem. 
 
 - **Self-contained dark palette.** All colors are pinned to hardcoded hex values — the panel deliberately ignores Discord's CSS theme variables, so BetterDiscord/Vencord/custom themes can't make the UI look terrible. Single-source palette at the top of `styles.css` if you ever want to retune.
 
-- **Defensive null handling**, run-instance fencing for stop+start races, log auto-trim at 1000 entries. Stop-and-resume during a wait used to corrupt the run; instance tracking and an interruptible sleep fix that.
+- **Defensive null handling**, run-instance fencing for stop+start races, log auto-trim at 1000 entries. Stop-and-resume during a wait used to corrupt the run; instance tracking and an interruptible sleep fix that. No more waiting for last pages either. 
+
+- **Filter overhaul**, split the filtering up into two parts. Search filter is the built-in filter within the Discord API. A very powerful and underused tool that could pick 100 messages out of a million, and return only that to the user for processing. It's not great at exclusion, only at narrowing down a lot within what's included. The job of excluding from deletions falls to the Delete filter. Which is a client side check against the set parameters. 
+
+Eg: 
+> 'I want to delete every @Alice message I ever made in the server, except the ones with my hilarious memes.'
+
+>Set up @AliceUserID in mentions in the Search filter, this narrows down every single message in the server to say, 100 that contain an @Alice mention. Flick the images on in the Delete filter, and the script will go through those 100 posts, and skip deleting the ones with an image attachment. 
 
 ## Install
 
@@ -30,7 +55,7 @@ Install a userscript manager — [Tampermonkey](https://www.tampermonkey.net/) (
 
 Then install the script via either path:
 
-- **Greasy Fork** *(easiest — once published)* — visit the [Greasy Fork listing](https://greasyfork.org/) and click **Install this script**.
+- **Greasy Fork** *(easiest — once(If ever)published)* — visit the [Greasy Fork listing](https://greasyfork.org/) and click **Install this script**.
 - **Direct from GitHub** — click **[undiscord-lite.user.js](https://github.com/OrbitalCheese/undiscord-lite/raw/master/undiscord-lite.user.js)**. Your userscript manager will detect the metadata banner and prompt you to install.
 
 Open/reload Discord afterwards. A trash icon mounts in Discord's left rail just above the server list — click it (or press `Ctrl+Shift+D`) to open the panel. If Discord's DOM doesn't expose the expected anchors, a fallback floating action button appears in the bottom-right corner instead.
@@ -41,9 +66,9 @@ Open the panel with the trash icon or `Ctrl+Shift+D`. The panel is draggable by 
 
 ### Author ID
 
-The Author ID field determines whose messages get deleted. Click **`Me`** to auto-fill your own user ID. You can paste a different user's ID, but Discord will only let you delete messages on channels where you have **Manage Messages** permission for that user (e.g. moderating your own server).
+The Author ID field determines whose messages get deleted. Click **`Me`** to auto-fill your own user ID. If you fail to put in an AuthorID it defaults to your own. You can paste a different user's ID, but Discord will only let you delete messages on channels where you have **Manage Messages** permission for that user (e.g. moderating your own server).
 
-Comma-separate IDs (`id1,id2,id3`) to delete from multiple authors in one batch — the run expands to one job per (target × author). Non-self authors require Manage Messages on each target server; a one-shot pre-flight check at the start of the batch verifies this and aborts early on any failure. DMs only delete your own messages, so they spawn one self-author job regardless of how many IDs are listed.
+Comma-separate IDs (`id1,id2,id3`) to delete from multiple authors in one batch — the run expands to one job per (target × author). The pastebox auto-formats this when you paste in new ID's one at a time. Non-self authors require Manage Messages on each target server; a one-shot pre-flight check at the start of the batch verifies this and aborts early on any failure. In DMs you can only ever delete your own messages, so they spawn one self-author job regardless of how many IDs are listed.
 
 ### Building the queue
 
@@ -61,7 +86,7 @@ Mix and match across as many servers as you want — order doesn't matter, the q
 
 **Wiping every DM at once.** Click the **`Add DM's`** button in the DMs fieldset. It calls Discord's own `GET /users/@me/channels` endpoint with your existing auth token and queues every 1:1 DM currently open in your sidebar. Group DMs are skipped by default — toggle the **group DMs** pill (red/off → green/on) next to it to include them too.
 
-> Only currently-open DMs are queued. Conversations you've X'd out of the sidebar aren't returned by that endpoint — Discord considers them minimized rather than active. Re-open the DM in Discord first, then click `Add DM's` again.
+> Only currently-open DMs are queued. Conversations you've X'd out of the sidebar aren't returned by that endpoint — Discord considers them minimized rather than active. Re-open the DM in Discord first, then click `Add DM's` again. Or import message data for a comprehensive wipe.
 
 ### Running
 
@@ -79,7 +104,7 @@ Collapsible sidebar sections:
 
 - **Delete filter** — drops messages from the queue *after* the search returns them: skip-text (substring or exact-word), the same set of attachment toggles, `@everyone / @here`, and a list of `@user` mentions to skip.
 
-> **Mention asymmetry.** The Search filter's <kbd>Include @user</kbd> field accepts **one** ID — Discord's `mentions=` query param only filters by a single mentioned user per request. The Delete filter's <kbd>Skip @user</kbd> field accepts **any number** of comma-separated IDs, because the skip is a client-side check after the response: every listed ID is matched against each message's mentions. So if you queue a 10k-message run and want to skip three users, list all three on the Skip side and they'll all be honored in one pass.
+> **Mention asymmetry.** The Search filter's <kbd>Include @user</kbd> field accepts **one** ID — Discord's `mentions=` query param only filters by a single mentioned user per request. The Delete filter's <kbd>Skip @user</kbd> field accepts **any number** of comma-separated IDs, because the skip is a client-side check after the response: every listed ID is matched against each message's mentions. So if you queue a 10k-message run and want to skip three @users, list all three on the Skip side and they'll all be honored in one pass.
 
 - **Messages interval** — min/max snowflake IDs to bound the deletion. Right-click a message in Discord → Copy Message ID. Useful for "delete everything I posted after this point" or "only the last week."
 
@@ -89,18 +114,13 @@ Collapsible sidebar sections:
 
 - **Import data export** — pre-load message IDs from your Discord data export and skip the search phase entirely (~3-5x faster on large wipes; no search-index-lag failure modes). See [Import mode](#import-mode) below.
 
-> Discord's UI no longer lets you copy a raw message ID — only a message *link*. Paste the link and trim everything before the last segment: `https://discord.com/channels/<server>/<channel>/<MessageID>` — keep the last number.
+> Discord's UI requires dev mode to be on to copy raw message ID — only a message *link* can be copied otherwise. The texbox auto-strips the link down to the messageID, so you *can* just paste it in there with no problems.
 >
 > Around 30s is the practical floor for the search delay. Below that, Discord returns smaller batches per call until you're retrying more often than deleting. **40-45s search + 0.5–1s delete** is the sweet spot for consistent results.
 
 ## Import mode
 
-If you've already requested your Discord data (User Settings → Privacy & Safety → **Request All My Data**), the resulting ZIP contains a complete index of every message you've ever sent. Import mode reads that index directly and skips Discord's search API entirely — turning a multi-hour wipe into a delete-only run.
-
-**When to use it:**
-- You're wiping thousands of messages and want it to finish in hours instead of half a day.
-- Discord's search index is missing recent messages (a known intermittent issue).
-- You want to delete from channels in servers Discord's search has been flaky on.
+If you've already requested your Discord data (User Settings → Privacy & Safety → **Request All My Data**), the resulting ZIP contains a complete index of every message you've ever sent. Import mode reads that index directly and skips Discord's search API entirely — turning a multi-hour wipe into a lightning fast delete-only run.
 
 **How to use it:**
 
@@ -129,8 +149,6 @@ If you've already requested your Discord data (User Settings → Privacy & Safet
 
 **Privacy:** the export is parsed locally in your browser (`FileReader.text()`). Nothing is uploaded — there is no code path that sends imported data anywhere. The same `grep` rules in the [Privacy](#privacy) section catch any regression of this guarantee.
 
-> The export contains every DM you've ever had. Don't commit `messages/`, `package/`, or `*.zip` to a git repo by accident. The included `.gitignore` already covers these.
-
 ## How it works
 
 A walkthrough of what happens after you click `▶︎ Delete`. Every step lines up with a function in the source so the trail is easy to follow.
@@ -155,6 +173,17 @@ Every step that touches the network is one of four `fetch()` calls listed in the
 
 ## Privacy
 
+**Common sense warning** ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
+DONT TRUST ANYTHING I SAY IN THIS SECTION BLINDLY WITHOUT VERIFYING AND UNDERSTANDING IT FIRST.
+
+Running unverified code off the internet blindly is a recipe for disaster.  
+
+Independently verify all the claims made. 
+
+Don't run the code if you don't understand what it's doing, or don't trust the source.
+
+I am just some guy on the internet. I am NOT a trust-worthy source. 
+
 **Short version:** your auth token is never stored, never logged, and never sent anywhere except `discord.com`.
 
 The longer version, in case you want to verify it yourself (you should):
@@ -175,10 +204,10 @@ The longer version, in case you want to verify it yourself (you should):
 - **Where the token doesn't go.** Never written to `localStorage`, `IndexedDB`, cookies, files, or any other persistent storage. Never serialized into the log area. Never sent to GitHub, Greasy Fork, the author, an analytics service, or anything else — there is no code that talks to anything other than `discord.com`. Closing the tab clears it from memory.
   - verify yourself: `grep -rEn 'localStorage\.setItem|indexedDB|document\.cookie|navigator\.sendBeacon' src/` — zero hits
 
-- **No telemetry, no analytics, no update beacons.** Update checks happen at the userscript-manager layer (Tampermonkey, Violentmonkey, etc) as this repo gets updated, never from inside this script.
+- **No telemetry, no analytics, no update beacons.** Update checks happen at the userscript-manager layer (Tampermonkey, Violentmonkey, etc) if this repo ever gets updated, never from inside this script.
   - verify yourself: `grep -rEn 'fetch\(|XMLHttpRequest|WebSocket|sendBeacon' src/` — only the four `discord.com` fetches above
 
-- **No third-party code, fully self-contained.** Zero `npm` dependencies, zero `@require` directives, no remote script injection. `@grant none` means no `GM_*` privileges, no CSP bypass, no cross-origin reach beyond what a normal page script has. The bundle has no `<img>`, `<link>`, `<script>`, `@font-face`, `@import`, or `url(http...)` references — every icon is inline SVG, every font falls through to system fonts, every color has a hardcoded hex fallback. After install, you could block every domain except `discord.com` and the script would still work.
+- **No third-party code, fully self-contained.** Zero `npm` dependencies, zero `@require` directives, no remote script injection. `@grant none` means no `GM_*` privileges, no CSP bypass, no cross-origin reach beyond what a normal page script has. The bundle has no `<img>`, `<link>`, `<script>`, `@font-face`, `@import`, or `url(http...)` references — every icon is inline SVG, every font/emoji falls through to system fonts, every color is hardcoded hex.
   - userscript metadata banner — [`undiscord-lite.user.js:1-11`](undiscord-lite.user.js#L1-L11) (`@grant none`, no `@require`)
   - dependency manifest — [`package.json`](package.json) (no `dependencies` or `devDependencies` blocks)
 
@@ -187,6 +216,7 @@ The longer version, in case you want to verify it yourself (you should):
   - auto-trim limit — [`src/undiscord-ui.js:1248`](src/undiscord-ui.js#L1248) (`LOG_MAX_ENTRIES`)
 
 - **Auditable.** The bundled script is ~3,000 lines of readable JavaScript in one file ([`undiscord-lite.user.js`](undiscord-lite.user.js)). No minification, no obfuscation. Open it in any text editor before installing.
+
 
 ## Build
 
@@ -203,6 +233,7 @@ Outputs `undiscord-lite.user.js` at the repo root.
 > ⚠️ Discord's terms of service forbid automated user-account actions (self-bots). Using this tool could result in account termination. Use at your own risk, on your own account, on your own data.
 
 This tool only deletes messages owned by the account it's run on (or messages the account has the *Manage Messages* privilege over) via the same HTTP endpoints Discord's UI uses.
+
 
 ## Credits
 

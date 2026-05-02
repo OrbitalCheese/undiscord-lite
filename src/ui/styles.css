@@ -300,12 +300,6 @@ body.undiscord-selecting * { cursor: crosshair !important; }
 #undiscord input[type="checkbox"]:checked { background-color: #3a7d4d; }
 #undiscord input[type="checkbox"]:checked::after { transform: translateX(18px); }
 
-#undiscord .sectionDescription.tips > div {
-    padding-left: 0.9em;
-    text-indent: -0.9em;
-    margin-bottom: 3px;
-}
-
 #undiscord #queueCounter {
     display: grid;
     grid-template-columns: max-content max-content;
@@ -857,23 +851,46 @@ body.undiscord-selecting * { cursor: crosshair !important; }
   border-radius: 2px;
 }
 
+/* ---------- Streamer mode ---------- */
+
+/* When the Streamer mode toggle is on (panel root carries .streamer-on), every
+   input field that holds a Discord ID renders its value as dots so screen
+   recordings, streams, and shoulder-surfing don't leak user / server / channel
+   / message IDs. Placeholders are unaffected (they describe the field, not its
+   value). The text-content filter inputs (Include text, Skip text), date
+   pickers, and delay steppers stay readable — those don't carry sensitive IDs.
+   text-security is the unprefixed proposed standard; -webkit-text-security is
+   what Chromium / Discord's Electron client actually honours today. */
+#undiscord.streamer-on input#authorId,
+#undiscord.streamer-on input#guildId,
+#undiscord.streamer-on input#channelId,
+#undiscord.streamer-on input#mentionsId,
+#undiscord.streamer-on input#excludeMentionsId,
+#undiscord.streamer-on input#minId,
+#undiscord.streamer-on input#maxId {
+  -webkit-text-security: disc;
+  text-security: disc;
+}
+
 /* ---------- Sidebar action group ---------- */
 
-/* Pinned at the top of the sidebar above all <details> sections — primary
-   Delete (weighted 2x) plus Stop and Clear Log. CSS grid so the buttons size
-   to the sidebar width without each carrying inline width overrides. */
+/* Pinned at the top of the sidebar above all <details> sections. Two stacked
+   full-width buttons: the primary action (#start) on row 1 plus Clear Log on
+   row 2. The primary's text/class/handler toggle between "▶︎ Delete" (idle,
+   red) and "🛑 Stop" (running, red) so the layout never reflows when a run
+   starts — the same physical button just changes role. */
 #undiscord #sidebarActions {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 4px;
   margin-bottom: 6px;
 }
-#undiscord #sidebarActions button {
-  /* Override the .btn baseline width / min-width — grid columns own the sizing. */
-  width: auto;
+#undiscord #sidebarActions > button {
+  width: 100%;
   min-width: 0;
   height: 38px;
   min-height: 38px;
+  padding: 2px 6px;
 }
 /* Center the import-mode badge (when shown) directly below the action buttons.
    When the badge is hidden the row still occupies a few px of vertical space

@@ -41,9 +41,17 @@ const BANNER = buildBanner({
   namespace:   pkg.userScript.namespace,
   match:       pkg.userScript.match,
   grant:       pkg.userScript.grant,
-  // downloadURL/updateURL are optional — when present, Tampermonkey checks them for new versions.
+  // Optional banner fields. Each is included only if present in package.json
+  // so the rendered metadata stays minimal when a field isn't configured.
+  //   author / license      — shown by Tampermonkey and required by Greasy Fork
+  //   homepageURL / supportURL — shown in the Tampermonkey install prompt
+  //   downloadURL / updateURL  — Tampermonkey checks these for new versions
+  ...(pkg.userScript.author      && { author:      pkg.userScript.author }),
+  ...(pkg.userScript.license     && { license:     pkg.userScript.license }),
+  ...(pkg.userScript.homepageURL && { homepageURL: pkg.userScript.homepageURL }),
+  ...(pkg.userScript.supportURL  && { supportURL:  pkg.userScript.supportURL }),
   ...(pkg.userScript.downloadURL && { downloadURL: pkg.userScript.downloadURL }),
-  ...(pkg.userScript.updateURL && { updateURL: pkg.userScript.updateURL }),
+  ...(pkg.userScript.updateURL   && { updateURL:   pkg.userScript.updateURL }),
 });
 
 // ---------- Module loader ----------
