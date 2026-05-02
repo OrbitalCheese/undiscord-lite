@@ -183,8 +183,8 @@ The longer version, in case you want to verify it yourself (you should):
   - dependency manifest — [`package.json`](package.json) (no `dependencies` or `devDependencies` blocks)
 
 - **What gets logged locally.** The panel's log shows usernames, message content, attachment metadata, and message IDs as items are deleted (so you can confirm what's happening). It's rendered into the DOM in your own tab — not transmitted, not persisted, and wiped when you click **Clear Log** or close the tab. Auto-trims at 1000 entries.
-  - log renderer — [`src/undiscord-ui.js:1216`](src/undiscord-ui.js#L1216) (`printLog`)
-  - auto-trim limit — [`src/undiscord-ui.js:1211`](src/undiscord-ui.js#L1211) (`LOG_MAX_ENTRIES`)
+  - log renderer — [`src/undiscord-ui.js:1253`](src/undiscord-ui.js#L1253) (`printLog`)
+  - auto-trim limit — [`src/undiscord-ui.js:1248`](src/undiscord-ui.js#L1248) (`LOG_MAX_ENTRIES`)
 
 - **Auditable.** The bundled script is ~3,000 lines of readable JavaScript in one file ([`undiscord-lite.user.js`](undiscord-lite.user.js)). No minification, no obfuscation. Open it in any text editor before installing.
 
@@ -202,7 +202,7 @@ Outputs `undiscord-lite.user.js` at the repo root.
 
 > ⚠️ Discord's terms of service forbid automated user-account actions (self-bots). Using this tool could result in account termination. Use at your own risk, on your own account, on your own data.
 
-This tool only deletes messages owned by the account it's run on, (Or messages the account has the *Manage Messages* privilege over.) via the same HTTP endpoints Discord's UI uses.
+This tool only deletes messages owned by the account it's run on (or messages the account has the *Manage Messages* privilege over) via the same HTTP endpoints Discord's UI uses.
 
 ## Credits
 

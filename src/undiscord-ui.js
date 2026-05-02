@@ -32,7 +32,7 @@ const ui = {
   // progress handler
   progressMain: null,
   progressIcon: null,
-  percent: null,
+  topBarSlot: null, // unified status line above the log — idle hint or running progress
 };
 const $ = s => ui.undiscordWindow.querySelector(s);
 
@@ -200,7 +200,7 @@ function removeChannel(server, channel) {
     return;
   }
   if (groups[idx].length === 0) {
-    log.info(`${server} is queued as server-wide — use 'del' on the server to remove it.`);
+    log.info(`${server} is queued as server-wide — use 'Delete' on the server to remove it.`);
     return;
   }
   const cIdx = groups[idx].indexOf(channel);
@@ -233,19 +233,54 @@ function renderQueue() {
 
   if (groups.size === 0 && !orphans) {
     counter.innerHTML = '';
+  } else {
+    const cells = [];
+    let i = 0;
+    for (const count of groups.values()) {
+      const label = letterLabel(i++);
+      cells.push(`<span>Server: ${label}</span><span>|| Channels: ${count === 0 ? 'All' : count}</span>`);
+    }
+    if (orphans) {
+      cells.push(`<span class="qc-orphan">Orphans:</span><span class="qc-orphan">|| ${orphans} channel${orphans > 1 ? 's' : ''} without a server</span>`);
+    }
+    counter.innerHTML = cells.join('');
+  }
+
+  // Top bar reflects the same configuration — refresh it whenever the queue changes.
+  renderTopBar();
+}
+
+// Top-bar status line above the log. Idle state: shows what the next click on
+// Delete will actually do (queue summary, import summary, or empty-queue hint).
+// Running state is owned by bindCoreEvents().onProgress — this function bails
+// out if a run is in flight so it can't overwrite mid-run progress text.
+function renderTopBar() {
+  if (!ui.topBarSlot) return; // not yet cached (called pre-init)
+  if (undiscordCore.state.running) return; // onProgress owns the slot during a run
+
+  if (importedSet) {
+    const { messages, channelCount, oldestTs, newestTs } = importedSet;
+    const fmt = (ts) => ts ? new Date(ts).toISOString().slice(0, 7) : '—'; // YYYY-MM is enough for top-bar density
+    ui.topBarSlot.innerHTML =
+      `<span class="status-line">Ready: ` +
+      `${messages.length.toLocaleString()} message${messages.length === 1 ? '' : 's'} from ` +
+      `${channelCount} channel${channelCount === 1 ? '' : 's'} ` +
+      `(${fmt(oldestTs)} → ${fmt(newestTs)}) — import mode</span>`;
     return;
   }
 
-  const cells = [];
-  let i = 0;
-  for (const count of groups.values()) {
-    const label = letterLabel(i++);
-    cells.push(`<span>Server: ${label}</span><span>|| Channels: ${count === 0 ? 'All' : count}</span>`);
+  const { targets } = parseTargets();
+  if (targets.length === 0) {
+    ui.topBarSlot.innerHTML =
+      `<span class="status-line status-empty">Empty queue — add a target or import a data export.</span>`;
+    return;
   }
-  if (orphans) {
-    cells.push(`<span class="qc-orphan">Orphans:</span><span class="qc-orphan">|| ${orphans} channel${orphans > 1 ? 's' : ''} without a server</span>`);
-  }
-  counter.innerHTML = cells.join('');
+
+  const servers = new Set(targets.map(t => t.guildId));
+  ui.topBarSlot.innerHTML =
+    `<span class="status-line">Ready: ` +
+    `${servers.size} server${servers.size === 1 ? '' : 's'} · ` +
+    `${targets.length} target${targets.length === 1 ? '' : 's'} queued</span>`;
 }
 
 // 0→A, 1→B, ..., 25→Z, 26→AA, 27→AB, ...
@@ -258,9 +293,11 @@ function letterLabel(i) {
   return s;
 }
 
-// Entry point. Called once on script load: injects the panel HTML/CSS, mounts the
-// floating trash-icon button, registers Ctrl+Shift+D, and binds every panel button
-// to its handler. After this returns, the script is idle until the user clicks Delete.
+// Entry point. Called once on script load: injects the panel HTML/CSS, mounts
+// the trash icon (in Discord's left server-bar by default, with a bottom-right
+// floating-action-button as fallback), registers Ctrl+Shift+D, and binds every
+// panel button to its handler. After this returns, the script is idle until
+// the user clicks Delete.
 function initUI() {
 
   insertCss(styles);
@@ -293,14 +330,17 @@ function initUI() {
     }
   }, true);
 
+  // Toggle the panel open/closed and dim/brighten the FAB icon to match. The
+  // server-bar button has its own hover/state styling driven by CSS — only the
+  // FAB needs an explicit color flip here.
   function toggleWindow() {
     if (ui.undiscordWindow.style.display !== 'none') {
       ui.undiscordWindow.style.display = 'none';
-      ui.undiscordBtn.style.color = 'var(--interactive-normal)';
+      ui.undiscordBtn.style.color = '#b5bac1'; // muted (matches --_u-int)
     }
     else {
       ui.undiscordWindow.style.display = '';
-      ui.undiscordBtn.style.color = 'var(--interactive-active)';
+      ui.undiscordBtn.style.color = '#ffffff'; // bright (matches --_u-int-active)
     }
   }
 
@@ -353,7 +393,7 @@ function initUI() {
   ui.autoScroll = $('#autoScroll');
   ui.progressMain = $('#progressBar');
   ui.progressIcon = ui.undiscordBtn.querySelector('progress');
-  ui.percent = $('#progressPercent');
+  ui.topBarSlot = $('#topBarSlot');
 
   $('#hide').onclick = toggleWindow;
   $('button#start').onclick = startAction;
@@ -415,7 +455,7 @@ function initUI() {
       : `Queued ${direct} direct DM${direct === 1 ? '' : 's'} (group DMs excluded).`;
     log.info(summary);
   };
-  // Del DMs: strip the @me server entry (and all its DM channels) from the queue.
+  // Clear DM's: strip the @me server entry (and all its DM channels) from the queue.
   $('button#delAllDms').onclick = () => {
     const { servers, groups } = readQueue($('input#guildId').value, $('input#channelId').value);
     const idx = servers.indexOf('@me');
@@ -1227,8 +1267,10 @@ function printLog(type = '', args) {
   if (type === 'error') console.error(LOG_PREFIX, ...args);
 }
 
-// Wires the core's lifecycle callbacks (onStart / onProgress / onStop) into UI updates:
-// disables/enables buttons, animates the trash FAB, and updates the progress bar.
+// Wires the core's lifecycle callbacks (onStart / onProgress / onStop) into UI
+// updates: disables/enables the action buttons, flips the trash icon (FAB and
+// server-bar variant) into its red/active running state, updates the visual
+// progress bar, and writes the live progress text into the top-bar slot.
 function bindCoreEvents() {
   undiscordCore.onStart = () => {
     $('#start').disabled = true;
@@ -1236,7 +1278,8 @@ function bindCoreEvents() {
     ui.undiscordBtn.classList.add('running');
     if (ui.serverBarBtn) ui.serverBarBtn.classList.add('running');
     ui.progressMain.style.display = 'block';
-    ui.percent.style.display = 'block';
+    // Initial running-state text — onProgress overwrites once we have numbers.
+    ui.topBarSlot.innerHTML = `<span class="status-line status-running">Starting…</span>`;
   };
 
   undiscordCore.onProgress = (state, stats) => {
@@ -1247,7 +1290,7 @@ function bindCoreEvents() {
       const percent = Math.round(value / max * 100) + '%';
       const elapsed = msToHMS(Date.now() - stats.startTime.getTime());
       const remaining = msToHMS(stats.etr);
-      ui.percent.innerHTML = `${percent} (${value}/${max}) Elapsed: ${elapsed} Remaining: ${remaining}`;
+      ui.topBarSlot.innerHTML = `<span class="status-line status-running">${percent} (${value}/${max}) · Elapsed ${elapsed} · Remaining ${remaining}</span>`;
       ui.progressIcon.setAttribute('max', max);
       ui.progressMain.setAttribute('max', max);
       ui.progressIcon.value = value;
@@ -1259,7 +1302,7 @@ function bindCoreEvents() {
         srvProgress.value = value;
       }
     } else {
-      ui.percent.innerHTML = '...';
+      ui.topBarSlot.innerHTML = `<span class="status-line status-running">Working…</span>`;
       ui.progressIcon.removeAttribute('value');
       ui.progressMain.removeAttribute('value');
     }
@@ -1275,7 +1318,8 @@ function bindCoreEvents() {
     ui.undiscordBtn.classList.remove('running');
     if (ui.serverBarBtn) ui.serverBarBtn.classList.remove('running');
     ui.progressMain.style.display = 'none';
-    ui.percent.style.display = 'none';
+    // Restore the idle status (queue / import / empty hint).
+    renderTopBar();
   };
 }
 
@@ -1336,7 +1380,7 @@ async function checkBatchPermissions(jobs, authToken) {
   }
 
   for (const f of failures) {
-    log.error(`You do not have permissions on Server id: ${f.serverId} to delete the messages of UserId('s): ${f.authors.join(', ')}`);
+    log.error(`You do not have permission on Server ID ${f.serverId} to delete messages from User ID(s): ${f.authors.join(', ')}.`);
   }
   log.error('Run aborted by pre-flight permission check.');
   return false;
@@ -1396,11 +1440,13 @@ function renderImportSummary() {
   const el = $('#importSummary');
   if (!importedSet) {
     el.textContent = 'No import loaded.';
-    return;
+  } else {
+    const { messages, channelCount, oldestTs, newestTs } = importedSet;
+    const fmt = (ts) => ts ? new Date(ts).toISOString().slice(0, 10) : '—';
+    el.textContent = `Imported ${messages.length.toLocaleString()} messages across ${channelCount} channel${channelCount === 1 ? '' : 's'} · oldest ${fmt(oldestTs)} · newest ${fmt(newestTs)}`;
   }
-  const { messages, channelCount, oldestTs, newestTs } = importedSet;
-  const fmt = (ts) => ts ? new Date(ts).toISOString().slice(0, 10) : '—';
-  el.textContent = `Imported ${messages.length.toLocaleString()} messages across ${channelCount} channel${channelCount === 1 ? '' : 's'} · oldest ${fmt(oldestTs)} · newest ${fmt(newestTs)}`;
+  // Top bar mirrors the same state (idle: queue, import, or empty hint).
+  renderTopBar();
 }
 
 // Import-mode entry point — peer of startAction(). Skips the queue, permission

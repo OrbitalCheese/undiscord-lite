@@ -1,7 +1,8 @@
-# Local-only directories
+# Local-only directories and notes
 .claude/
 .vscode/
 .git.backup/
+backUpDirectives.md
 
 # Node — only relevant if someone ever runs `npm i` (we have zero deps)
 node_modules/

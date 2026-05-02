@@ -12,7 +12,7 @@
 #undiscord {
   --_u-bg-panel:        #2b2d31;
   --_u-bg-header:       #1e1f22;
-  --_u-bg-sidebar:      #1e1f22;
+  --_u-bg-sidebar:      #17181b; /* deliberately darker than --_u-bg-input so text fields visually sit on top of the sidebar instead of blending into it */
   --_u-bg-main:         #313338;
   --_u-bg-toolbar:      #2b2d31;
   --_u-bg-input:        #1e1f22;
@@ -687,11 +687,28 @@ body.undiscord-selecting * { cursor: crosshair !important; }
     margin-bottom: 4px;
 }
 
-#undiscord .footer #progressPercent {
-    padding: 0 1em;
-    font-size: small;
-    color: var(--_u-text-muted);
+/* Top-bar status line. Idle state: a queue/import summary or empty-queue hint.
+   Running state: live progress text (percent / value / elapsed / remaining).
+   Lives inside #topBarSlot which is the first row of the top toolbar above the
+   log area; the second row holds the visual <progress> element. */
+#undiscord #topBarSlot {
     flex-grow: 1;
+    min-height: 20px;
+}
+#undiscord .status-line {
+    padding: 2px 6px;
+    font-size: 13px;
+    color: var(--_u-text-muted);
+    line-height: 20px;
+}
+#undiscord .status-line.status-empty {
+    font-style: italic;
+}
+#undiscord .status-line.status-running {
+    color: var(--_u-text);
+    font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    font-size: 12px;
+    letter-spacing: 0.2px;
 }
 
 /**** Elements ****/
@@ -840,11 +857,50 @@ body.undiscord-selecting * { cursor: crosshair !important; }
   border-radius: 2px;
 }
 
+/* ---------- Sidebar action group ---------- */
+
+/* Pinned at the top of the sidebar above all <details> sections — primary
+   Delete (weighted 2x) plus Stop and Clear Log. CSS grid so the buttons size
+   to the sidebar width without each carrying inline width overrides. */
+#undiscord #sidebarActions {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+#undiscord #sidebarActions button {
+  /* Override the .btn baseline width / min-width — grid columns own the sizing. */
+  width: auto;
+  min-width: 0;
+  height: 38px;
+  min-height: 38px;
+}
+/* Center the import-mode badge (when shown) directly below the action buttons.
+   When the badge is hidden the row still occupies a few px of vertical space
+   above the <hr> — visually negligible (~4px), and avoids the fragility of
+   selecting on inline display:none across HTML/JS serialization quirks. */
+#undiscord #sidebarBadgeRow {
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+/* ---------- Footer toggles ---------- */
+
+/* Streamer mode + Auto scroll inline labels in the footer row. Tighter spacing
+   and no uppercase styling (overrides the global label rule). */
+#undiscord .footer .footer-toggle {
+  margin-bottom: 0;
+  margin-right: 12px;
+  text-transform: none;
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
 /* ---------- Import mode ---------- */
 
-/* The "import mode" pill in the toolbar. Hidden by default; shown only when
-   undiscord-ui.js toggles its display. Discord-blurple to read as a status
-   indicator, not a button — no hover state. */
+/* The "import mode" status chip — shown in the sidebar's badge row when an
+   export is loaded. Discord-blurple, reads as a status indicator (no hover state). */
 #undiscord #importBadge.import-badge {
   background: #5865f2;
   color: #ffffff;
@@ -854,8 +910,7 @@ body.undiscord-selecting * { cursor: crosshair !important; }
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  margin-left: 12px;
-  margin-bottom: 0;
+  margin: 0;
   display: inline-flex;
   align-items: center;
   user-select: none;

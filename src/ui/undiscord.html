@@ -18,6 +18,15 @@
     </div>
     <div class="window-body" style="display: flex; flex-direction: row;">
         <div class="sidebar scroll">
+            <div id="sidebarActions">
+                <button id="start" class="danger" title="Start the deletion process">▶︎ Delete</button>
+                <button id="stop" title="Stop the deletion process" disabled>🛑 Stop</button>
+                <button id="clear" title="Clear the log area">Clear Log</button>
+            </div>
+            <div id="sidebarBadgeRow">
+                <span id="importBadge" class="import-badge" style="display:none;" title="An imported export is loaded. The General queue, Search filter, and Delete filter sections are ignored — only Date and Messages interval still apply.">import mode</span>
+            </div>
+            <hr>
             <details id="sectionGeneral" open>
                 <summary>General<button class="help-btn" data-help="tabGeneral" title="Show help for the General tab">Help</button></summary>
                 <fieldset>
@@ -252,13 +261,9 @@
             </details>
         </div>
         <div class="main col">
-            <div class="tbar col">
-                <div class="row">
-                    <button id="start" class="sizeMedium danger" style="width: 150px;" title="Start the deletion process">▶︎ Delete</button>
-                    <button id="stop" class="sizeMedium" title="Stop the deletion process" disabled>🛑 Stop</button>
-                    <button id="clear" class="sizeMedium">Clear Log</button>
-                    <span id="importBadge" class="import-badge" style="display:none;" title="An imported export is loaded. The General queue, Search filter, and Delete filter sections are ignored — only Date and Messages interval still apply.">import mode</span>
-                    <label class="row" style="margin-left: 12px; margin-bottom: 0;" title="Redact message content AND usernames in the log + confirmation preview"><input id="streamerMode" type="checkbox" checked>Streamer mode</label>
+            <div class="tbar col" id="topBar">
+                <div class="row" id="topBarSlot">
+                    <!-- Reserved for run-status info (filled by Pass 2). Empty in idle state. -->
                 </div>
                 <div class="row">
                     <progress id="progressBar" style="display:none;"></progress>
@@ -266,9 +271,11 @@
             </div>
             <pre id="logArea" class="logarea scroll"></pre>
             <div class="tbar footer row">
-                <div id="progressPercent"></div>
                 <span class="spacer"></span>
-                <label>
+                <label class="row footer-toggle" title="Redact message content AND usernames in the log + confirmation preview">
+                    <input id="streamerMode" type="checkbox" checked> Streamer mode
+                </label>
+                <label class="row footer-toggle">
                     <input id="autoScroll" type="checkbox" checked> Auto scroll
                 </label>
                 <div class="resize-handle"></div>
