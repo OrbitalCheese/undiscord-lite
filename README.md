@@ -82,7 +82,7 @@ Install a userscript manager — [Tampermonkey](https://www.tampermonkey.net/) (
 
 Then install the script via either path:
 
-- **Greasy Fork** *(easiest — once (if ever) published)* — visit the [Greasy Fork listing](https://greasyfork.org/) and click **Install this script**.
+- **Greasy Fork** *(easiest)* — visit the [Greasy Fork listing](https://greasyfork.org/en/scripts/576464-undiscord-lite) and click **Install this script**.
 - **Direct from GitHub** — click **[undiscord-lite.user.js](https://github.com/OrbitalCheese/undiscord-lite/raw/master/undiscord-lite.user.js)**. Your userscript manager will detect the metadata banner and prompt you to install.
 
 Open/reload Discord afterwards. A trash icon mounts in Discord's left rail just above the server list — click it (or press `Ctrl+Shift+D`) to open the panel. If Discord's DOM doesn't expose the expected anchors, a fallback floating action button appears in the bottom-right corner instead.
