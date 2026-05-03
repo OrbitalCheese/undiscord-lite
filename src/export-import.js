@@ -1,46 +1,35 @@
-// ---------- Discord data-export import ----------
-//
-// Parses an unzipped Discord data-export folder (the contents of `messages/`
-// inside the ZIP Discord ships) into a flat list of (channelId, messageId, ...)
-// records, and exposes an `ImportSource` that the run loop can consume in place
-// of Discord's search API.
-//
-// Why this exists: Discord's search-based wipe spends ~45s per page on the
-// search call. If the user already has a complete index of their messages
-// (the data export), we can skip search entirely and go straight to delete —
-// roughly 3-5x faster for large wipes, with no "search index lag" failure
-// modes. See README's Privacy section: parsing happens locally; nothing is
-// uploaded.
+// ============================================================================
+// DISCORD DATA-EXPORT IMPORT
+// ----------------------------------------------------------------------------
+// Parses the contents of an unzipped Discord data export's `messages/` folder
+// into a flat list of (channelId, messageId, ...) records, and exposes an
+// `ImportSource` that the run loop consumes in place of Discord's search API.
+// All parsing is local — no network access in this module.
 //
 // Folder shape (post-extraction):
 //   messages/
-//     index.json              ← { "<channelId>": "<display string>", ... }   (optional)
-//                                where <display string> is "<channel> in <guild>" for guild
-//                                channels and "Direct Message with <user>#<discriminator>" for DMs.
-//                                The DM string is the only place the friend's username appears —
-//                                channel.json's recipients field carries user IDs only.
+//     index.json              — { "<channelId>": "<display string>", ... }   (optional)
+//                               Display string is "<channel> in <guild>" for guild
+//                               channels and "Direct Message with <user>#<discriminator>"
+//                               for DMs. The DM string is the only place the friend's
+//                               username appears — channel.json's recipients carries IDs only.
 //     c<channelId>/
-//       channel.json          ← channel metadata (optional but preferred — see shapes in parseExport())
-//       messages.json         ← array of { ID, Timestamp, Contents, Attachments }
+//       channel.json          — channel metadata (optional but preferred)
+//       messages.json         — array of { ID, Timestamp, Contents, Attachments }
 //
-// Both casings are tolerated for message field names (Discord's exporter has
-// shipped both `ID`/`id` and `Contents`/`content` over the years).
+// Both letter-cases are tolerated for message field names (`ID`/`id`,
+// `Contents`/`content`, etc.) since Discord's exporter has shipped both.
+// ============================================================================
 
-// Walks a list of `File` objects (from `<input webkitdirectory>` or `multiple`)
-// and returns a flat record per message plus aggregate metadata for the UI's
-// summary line.
-//
-// Throws on hard parse failures (bad JSON, no c<id>/ folders found) so the
-// caller can surface a clear error to the user. Per-channel issues that don't
-// invalidate the rest of the import are skipped silently.
+/** Walks a list of `File` objects (from `<input webkitdirectory>` or `multiple`) and returns `{ messages, channelCount, oldestTs, newestTs }`. Throws on hard parse failures (bad JSON, no c<id>/ folders found); per-channel issues that don't invalidate the rest are skipped silently. */
 export async function parseExport(fileList) {
   const files = Array.from(fileList);
   if (files.length === 0) {
     throw new Error('No files selected.');
   }
 
-  // Top-level index.json (under messages/) maps channel ID → human-readable
-  // name. Optional — falls back to channel.json's `name` then "c<id>" stub.
+  // Top-level index.json maps channel ID → human-readable name. Optional —
+  // falls back to channel.json's `name`, then a "c<id>" stub.
   const indexFile = files.find(f => /(^|\/)index\.json$/i.test(relPath(f)));
   let nameIndex = {};
   if (indexFile) {
@@ -70,7 +59,7 @@ export async function parseExport(fileList) {
   let oldestTs = Infinity, newestTs = -Infinity;
 
   for (const [channelId, slot] of channelFiles) {
-    if (!slot.messages) continue; // bare folder with no messages.json — skip
+    if (!slot.messages) continue; // bare folder with no messages.json
 
     let channelMeta = {};
     if (slot.channel) {
@@ -87,8 +76,8 @@ export async function parseExport(fileList) {
     const guildId   = channelMeta.guild?.id   || null;
     const guildName = channelMeta.guild?.name || null;
     // DMs carry no username inside channel.json — only user IDs. The friend's
-    // username is available from index.json's "Direct Message with NAME#0"
-    // string. Group DMs may have a user-set `name` (or null for unnamed).
+    // display name comes from index.json's "Direct Message with NAME#0" string.
+    // Group DMs may have a user-set `name` (or null when unnamed).
     const dmFriendName = (type === 'DM') ? extractDmFriendName(nameIndex[channelId]) : null;
     const recipientIds = Array.isArray(channelMeta.recipients) ? channelMeta.recipients.map(String) : [];
     const recipientCount = recipientIds.length;
@@ -125,7 +114,7 @@ export async function parseExport(fileList) {
         type,
         dmFriendName,
         recipientCount,
-        recipientIds, // string IDs of every channel participant — used by the import-mode "Exclude User" filter for DM/GROUP_DM matching
+        recipientIds,
         messageId: String(messageId),
         timestamp,
         content,
@@ -142,51 +131,37 @@ export async function parseExport(fileList) {
   };
 }
 
-// `webkitRelativePath` is the folder-pick path (e.g. "messages/c123/messages.json").
-// Falls back to `name` for plain `multiple` selections so the parser still works
-// when the user shift-selects files without folder support.
+/** Returns a file's path relative to the picked folder root. Falls back to `name` when the picker doesn't expose `webkitRelativePath` (plain `multiple` selection). */
 function relPath(file) {
   return file.webkitRelativePath || file.name;
 }
 
-// Discord exports timestamps as "YYYY-MM-DD HH:MM:SS" (no `T`, no `Z`) — and
-// the values are UTC, verified against the snowflake the message ID encodes.
-// Plain `new Date("YYYY-MM-DD HH:MM:SS")` in JavaScript parses that as LOCAL
-// time, which silently shifts every imported timestamp by the user's TZ
-// offset. Normalising to ISO-with-Z here ensures every downstream parse
-// (filter pre-pass, oldest/newest summary, per-delete log timestamps) gets
-// the correct UTC instant. Already-ISO inputs (T-separator or trailing Z /
-// numeric offset) are passed through unchanged so future export formats keep
-// working without a code change here.
+/** Normalises a Discord export timestamp to ISO-with-Z form. Discord exports timestamps as "YYYY-MM-DD HH:MM:SS" UTC; plain `new Date()` parses that as LOCAL time, shifting every imported timestamp by the user's TZ offset. Already-ISO inputs (with T separator, trailing Z, or numeric offset) pass through unchanged. */
 function normalizeExportTs(str) {
   if (!str || typeof str !== 'string') return str;
-  // Has T separator OR trailing Z OR ±HH:MM offset → trust it.
   if (/T/.test(str) || /Z$/.test(str) || /[+-]\d\d:?\d\d$/.test(str)) return str;
-  // SQL-style "YYYY-MM-DD HH:MM:SS" → ISO UTC.
   return str.replace(' ', 'T') + 'Z';
 }
 
-// index.json's value for a DM channel looks like "Direct Message with USER#0".
-// Pull the username out (Discord's discriminator is always #0 since the 2023
-// username migration; we strip it regardless to be safe). Returns null when
-// the entry is missing or doesn't match the expected prefix.
+/** Pulls the friend's username out of an index.json DM display string ("Direct Message with USER#0"). Returns null when the entry is missing or doesn't match the expected prefix. */
 function extractDmFriendName(indexValue) {
   if (typeof indexValue !== 'string') return null;
   const m = indexValue.match(/^Direct Message with (.+?)(?:#\d+)?$/);
   return m ? m[1] : null;
 }
 
-// Builds a per-guild / per-DM breakdown of an imported set, returned as an
-// array of pre-formatted log lines for the UI to print verbatim. Sorted by
-// message count (desc) within each group so the heaviest sources surface first.
-//
-// Output shape:
-//   "Server: <name> | Channels: <N> | Messages: <total>"
-//   "DM:     <friend>                 | Messages: <total>"
-//   "Group DM: <name or count>        | Messages: <total>"
-//   "Unknown channel: <id>            | Messages: <total>"   (channel.json missing)
+/**
+ * Builds a per-guild / per-DM breakdown of an imported set, returned as an
+ * array of pre-formatted log lines. Sorted by message count (desc) within
+ * each group so the heaviest sources surface first.
+ *
+ * Output shape:
+ *   "Server: <name> | Channels: <N> | Messages: <total>"
+ *   "DM:     <friend>                | Messages: <total>"
+ *   "Group DM: <name or count>       | Messages: <total>"
+ *   "Unknown channel kind: <N>       | Messages: <total>"   (channel.json missing)
+ */
 export function summarizeImport(parsed) {
-  // Group by (kind, key). Guilds aggregate by guildId; DMs/groups stay per-channel.
   const guilds = new Map();   // guildId -> { name, channels:Set<channelId>, count }
   const dms = new Map();      // channelId -> { friend, count }
   const groups = new Map();   // channelId -> { name, recipientCount, count }
@@ -194,13 +169,12 @@ export function summarizeImport(parsed) {
 
   for (const m of parsed.messages) {
     if (m.type === 'GUILD_TEXT' || (m.guildId && m.type !== 'DM' && m.type !== 'GROUP_DM')) {
-      // Threads, voice text, announcements, etc. all roll up under their parent guild.
+      // Threads, voice text, announcements, etc. roll up under their parent guild.
       const key = m.guildId || `unknown-guild-for-${m.channelId}`;
       if (!guilds.has(key)) guilds.set(key, { name: m.guildName || 'Unknown Server', channels: new Set(), count: 0 });
       const g = guilds.get(key);
       g.channels.add(m.channelId);
       g.count++;
-      // Late-arriving guild name (in case earlier messages had it null and later ones don't)
       if (!g.name && m.guildName) g.name = m.guildName;
     } else if (m.type === 'DM') {
       if (!dms.has(m.channelId)) dms.set(m.channelId, { friend: m.dmFriendName || `(unknown — ${m.channelId})`, count: 0 });
@@ -209,7 +183,6 @@ export function summarizeImport(parsed) {
       if (!groups.has(m.channelId)) groups.set(m.channelId, { name: m.channelName, recipientCount: m.recipientCount, count: 0 });
       groups.get(m.channelId).count++;
     } else {
-      // Channel.json missing or type unrecognized — show what we have.
       if (!unknown.has(m.channelId)) unknown.set(m.channelId, 0);
       unknown.set(m.channelId, unknown.get(m.channelId) + 1);
     }
@@ -241,17 +214,14 @@ export function summarizeImport(parsed) {
   return lines;
 }
 
-// Discord's export stores Attachments as a comma- or whitespace-separated list
-// of CDN URLs. Inflate to the {url, content_type} shape filterResponse expects
-// for its excludeImage/Video/Sound checks. Content type is inferred from the
-// URL extension — good enough for the filter pass; not a perfect match for
-// Discord's authoritative MIME, but the post-search filter doesn't require it.
+/** Parses Discord's whitespace/comma-separated Attachment URL list into the `[{url, content_type}, ...]` shape filterResponse expects. content_type is inferred from the URL extension. */
 function parseAttachments(raw) {
   if (!raw) return [];
   const urls = String(raw).split(/[\s,]+/).filter(Boolean);
   return urls.map(url => ({ url, content_type: inferContentType(url) }));
 }
 
+/** Returns the inferred MIME type for a URL based on its extension. Falls back to 'application/octet-stream' for unknown extensions. */
 function inferContentType(url) {
   const ext = (url.toLowerCase().match(/\.([a-z0-9]+)(?:\?|$)/) || [])[1];
   if (!ext) return 'application/octet-stream';
@@ -261,14 +231,17 @@ function inferContentType(url) {
   return 'application/octet-stream';
 }
 
+
+// ============================================================================
+// IMPORT SOURCE
+// ----------------------------------------------------------------------------
 // Drop-in replacement for the search() side of the run loop. Holds the parsed
 // message list and a cursor; each fetchPage(core) call assigns the next slice
 // into core.state._searchResponse using the same shape Discord's search API
-// returns (so filterResponse() works unchanged).
-//
-// Pagination preserves the existing run-loop semantics: confirmation prompt
-// only sees the first page, ETR's running mean still converges, progress bar
-// updates per-page just like a search-mode run.
+// returns, so filterResponse() works unchanged.
+// ============================================================================
+
+/** Pages an in-memory message list into core.state._searchResponse, mimicking the shape of Discord's search API so the rest of the run loop is mode-agnostic. */
 export class ImportSource {
   static PAGE_SIZE = 50;
 
@@ -277,16 +250,12 @@ export class ImportSource {
     this.cursor = 0;
   }
 
-  // True once every imported record has been emitted at least once. The run
-  // loop checks this on empty pages to short-circuit the empty-page-retry
-  // budget — there's no search index to wait on in import mode.
+  /** True once every imported record has been emitted. Lets the run loop short-circuit the empty-page-retry budget — no search index to wait on in import mode. */
   get exhausted() {
     return this.cursor >= this.messages.length;
   }
 
-  // Mirror of UndiscordCore.search(): populate core.state._searchResponse with
-  // the next page. Each message is wrapped in a single-element conversation
-  // array with hit:true, matching Discord's `messages: [[{hit, ...}, ...]]` shape.
+  /** Populates core.state._searchResponse with the next page of messages. Each message is wrapped in a single-element conversation array with hit:true to match Discord's `messages: [[{hit, ...}, ...]]` shape. */
   fetchPage(core) {
     const slice = this.messages.slice(this.cursor, this.cursor + ImportSource.PAGE_SIZE);
     this.cursor += slice.length;
@@ -297,17 +266,13 @@ export class ImportSource {
   }
 }
 
-// Synthesize a Discord-API-shaped message from an export record. Fields the
-// export doesn't carry (mentions, embeds, author info, etc.) are stubbed with
-// safe defaults — filterResponse's exclude-* paths gracefully handle empty
-// arrays / falsy fields. Author is a placeholder ("imported#0") since the
-// export's per-message author info is implicit (your account, by definition).
+/** Builds a Discord-API-shaped message object from an export record. Fields the export doesn't carry (mentions, embeds, author info) are stubbed with safe defaults that filterResponse's exclude-* paths gracefully ignore. */
 function toApiShape(m) {
   return {
     hit: true,
     id: m.messageId,
     channel_id: m.channelId,
-    type: 0,                                  // regular user message — passes filterResponse's type filter
+    type: 0,                    // regular user message — passes filterResponse's type filter
     pinned: false,
     content: m.content || '',
     timestamp: m.timestamp,

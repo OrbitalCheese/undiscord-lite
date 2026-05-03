@@ -1,3 +1,13 @@
+// ============================================================================
+// UNDISCORD CORE — DELETE LOOP
+// ----------------------------------------------------------------------------
+// Owns the message-search-and-delete pipeline and the in-flight statistics it
+// produces. The UI layer feeds in `options`, listens on `onStart` /
+// `onProgress` / `onStop` / `onJob`, and calls `run()` (single target) or
+// `runBatch(queue)` (multiple). Pulls pages from Discord's search API, or
+// from an in-memory ImportSource when one is supplied.
+// ============================================================================
+
 import {
   log,
   msToHMS,
@@ -5,15 +15,81 @@ import {
   queryString,
   askYesNo,
   toSnowflake,
+  parseCsvList,
+  buildContentMatcher,
+  buildExtensionMatcher,
 } from './helpers.js';
 
 const API_BASE = 'https://discord.com/api/v9';
 const MAX_DELETE_ATTEMPTS = 2;     // Per-message retry on transient failures.
 const MAX_TRANSIENT_RETRIES = 3;   // Search-side retries for 5xx and network errors.
 
-// Human-readable labels for state.endReason — used in the failure-summary line
-// (the `else` branch in run()'s end-summary). 'completed' and 'no-matches' have
-// their own dedicated branches, so they're intentionally not in this map.
+
+// ============================================================================
+// DEFAULT OPTIONS
+// ----------------------------------------------------------------------------
+// Canonical schema for `core.options`. The constructor and `resetOptions()`
+// both seed from this; the UI orchestrators hand in a partial overlay. Add
+// new options here so both seed paths pick them up.
+// ============================================================================
+
+const DEFAULT_OPTIONS = {
+  authToken: null,
+  authorId: null,
+  guildId: null,
+  channelId: null,
+  minId: null,
+  maxId: null,
+  // Server-side search filters — passed through to Discord's search API.
+  content: null,
+  hasLink: null,    // has an auto-embedded link preview
+  hasImage: null,   // has image attachment
+  hasVideo: null,   // has video attachment
+  hasSound: null,   // has audio attachment
+  hasSticker: null, // has sticker
+  hasPoll: null,    // has a poll
+  hasEmbed: null,   // has any embed (broader than link — includes manual embeds)
+  hasForward: null, // has a forwarded message snapshot
+  mentions: null,         // @mentioning this user ID
+  mentionEveryone: null,  // has @everyone / @here
+  pinnedMode: 'exclude',  // 'exclude' | 'include' | 'only'
+  excludeNsfw: false,     // when true, age-gated NSFW channels are excluded; when false, Discord's include_nsfw=true is sent
+  // Post-search (client-side) filters — applied in filterResponse against
+  // each search-API page (or each import page when importSource is set).
+  excludeContent: null,
+  excludeMatchMode: 'substring', // 'substring' | 'exact' (word-boundary)
+  excludeLink: null,
+  excludeImage: null,
+  excludeVideo: null,
+  excludeSound: null,
+  excludeSticker: null,
+  excludePoll: null,
+  excludeEmbed: null,
+  excludeForward: null,
+  excludeMentions: null,        // CSV of user IDs (parsed via parseCsvList at filter time)
+  excludeMentionEveryone: null,
+  excludeExtensions: null,      // array of lowercase extensions, no leading dots
+  // Pacing / runtime knobs.
+  searchDelay: null,
+  deleteDelay: null,
+  maxEmptyPageRetries: 5, // re-fetch this many times when grandTotal says more remain but the page is empty
+  askForConfirmation: true,
+  streamerMode: false,    // redact message content + author usernames in confirmation preview and per-delete log
+  // When set, run() pulls pages from this source's fetchPage() instead of
+  // calling Discord's search API. Used by the data-export import flow to
+  // skip the search phase entirely. See src/export-import.js#ImportSource.
+  importSource: null,
+};
+
+
+// ============================================================================
+// END-REASON LABELS
+// ----------------------------------------------------------------------------
+// Human-readable labels for state.endReason — surfaced in the failure-summary
+// branch of run(). 'completed' and 'no-matches' have their own dedicated
+// summary branches and are not in this map.
+// ============================================================================
+
 const END_REASON_LABELS = {
   'empty-page-exhausted': 'Empty-page retry budget exhausted',
   'user-stopped': 'User cancelled',
@@ -23,11 +99,16 @@ const END_REASON_LABELS = {
   'api-error': 'API rejected the request',
 };
 
+
+// ============================================================================
+// UNDISCORD CORE CLASS
+// ============================================================================
+
 class UndiscordCore {
 
-  // ---- Private state ----
-  // run() bumps #runId on entry; each loop captures the value at start and bails
-  // out if it ever differs — meaning a fresh run() has superseded this loop.
+  // -------------------- Private state --------------------
+  // run() bumps #runId on entry; each loop captures the value at start and
+  // exits if it ever differs — a fresh run() has superseded this loop.
   #runId = 0;
   #waitAbort = null; // set while a #wait() is in flight; calling it resolves the wait early
   #beforeTs = 0;     // timestamp at request-send, used by afterRequest() for ping calc
@@ -47,50 +128,9 @@ class UndiscordCore {
     });
   }
 
-  // ---- Public configuration / state ----
-  options = {
-    authToken: null,
-    authorId: null,
-    guildId: null,
-    channelId: null,
-    minId: null,
-    maxId: null,
-    content: null,
-    hasLink: null,    // server-side: has an auto-embedded link preview
-    hasImage: null,   // server-side: has image attachment
-    hasVideo: null,   // server-side: has video attachment
-    hasSound: null,   // server-side: has audio attachment
-    hasSticker: null, // server-side: has sticker
-    hasPoll: null,    // server-side: has a poll
-    hasEmbed: null,   // server-side: has any embed (broader than link — includes manual embeds)
-    hasForward: null, // server-side: has a forwarded message snapshot
-    mentions: null,         // server-side: filter to messages @mentioning this user ID
-    mentionEveryone: null,  // server-side: filter to messages with @everyone / @here
-    pinnedMode: 'exclude',  // 'exclude' | 'include' | 'only' — server-side pinned filter
-    excludeContent: null, // post-search filter: drop messages containing this text
-    excludeMatchMode: 'substring', // 'substring' (term appears anywhere) | 'exact' (term appears as a standalone word)
-    excludeLink: null,    // post-search filter: drop messages with auto-link previews or URLs in content
-    excludeImage: null,   // post-search filter: drop messages with image attachments
-    excludeVideo: null,   // post-search filter: drop messages with video attachments
-    excludeSound: null,   // post-search filter: drop messages with audio attachments
-    excludeSticker: null, // post-search filter: drop messages with stickers
-    excludePoll: null,    // post-search filter: drop messages with polls
-    excludeEmbed: null,   // post-search filter: drop messages with any embed
-    excludeForward: null, // post-search filter: drop forwarded messages
-    excludeMentions: null,        // post-search filter: drop messages @mentioning ANY of these user IDs (comma-separated)
-    excludeMentionEveryone: null, // post-search filter: drop messages with @everyone / @here
-    excludeExtensions: null,      // post-search filter: drop messages whose attachments include any file with one of these extensions (array of lowercase strings, no leading dots)
-    excludeNsfw: false, // server-side: when true, age-gated NSFW channels are excluded from search results; when false (default), Discord includes them via include_nsfw=true
-    searchDelay: null,
-    deleteDelay: null,
-    maxEmptyPageRetries: 5, // re-fetch this many times when grandTotal says more remain but the page is empty
-    askForConfirmation: true,
-    streamerMode: false, // redact message content AND author usernames in the confirmation preview and per-delete log
-    // When set, run() pulls pages from this source's fetchPage() instead of
-    // calling Discord's search API. Used by the data-export import flow to
-    // skip the search phase entirely. See src/export-import.js#ImportSource.
-    importSource: null,
-  };
+  // -------------------- Public configuration / state --------------------
+
+  options = { ...DEFAULT_OPTIONS };
 
   state = {
     running: false,
@@ -119,16 +159,22 @@ class UndiscordCore {
     etr: 0,
   };
 
-  // events
+  // -------------------- Event hooks --------------------
+
   onStart = undefined;
   onProgress = undefined;
   onStop = undefined;
   // Fires once per batch iteration BEFORE the per-job run() begins, with the
-  // 1-based job index and the batch total. Single-job runs (startAction with
-  // one queued target, or startImportAction) don't go through runBatch and
-  // never fire this — the UI defaults to displaying "Job 1/1" instead.
+  // 1-based job index and the batch total. Single-job runs never fire this —
+  // the UI defaults to displaying "Job 1/1" instead.
   onJob = undefined;
 
+
+  // ========================================================================
+  // LIFECYCLE
+  // ========================================================================
+
+  /** Resets every counter / cursor on `state` to its initial value, ready for a fresh run. The confirmation prompt re-arms (the user is asked again on the next run). */
   resetState() {
     this.state = {
       running: false,
@@ -149,8 +195,12 @@ class UndiscordCore {
     this.options.askForConfirmation = true;
   }
 
-  // Batch wrapper. Calls run() once per queued (server, channel) target, sequentially.
-  // The confirmation prompt only fires on the first job; subsequent jobs proceed silently.
+  /** Resets `options` to DEFAULT_OPTIONS and overlays the caller's partial. Every option lands at a known value on each new run. */
+  resetOptions(overrides = {}) {
+    this.options = { ...DEFAULT_OPTIONS, ...overrides };
+  }
+
+  /** Runs `run()` once per queued (server, channel) target, sequentially. The confirmation prompt only fires on the first job; subsequent jobs proceed silently. */
   async runBatch(queue) {
     if (this.state.running) return log.error('Already running!');
 
@@ -174,9 +224,7 @@ class UndiscordCore {
     this.state.running = false;
   }
 
-  // Main delete loop for a single (server, channel) target. Repeats:
-  // search → filter → confirm (first page only) → delete page → wait,
-  // until the search returns empty or stop() fires.
+  /** Main delete loop for a single (server, channel) target. Repeats search → filter → confirm (first page only) → delete page → wait, until the search returns empty or stop() fires. */
   async run(inBatch = false) {
     if (this.state.running && !inBatch) return log.error('Already running!');
 
@@ -213,7 +261,6 @@ class UndiscordCore {
 
       // search() can short-circuit on stop during a 202/429 cooldown, returning
       // before _searchResponse is populated. Bail out cleanly in that case.
-      // (Import mode populates synchronously, but the bail check is harmless.)
       if (!this.state.running || this.#runId !== myRunId) return;
 
       await this.filterResponse();
@@ -238,13 +285,14 @@ class UndiscordCore {
         }
 
         await this.deleteMessagesFromList();
-        // If user clicked Stop during the delete loop, exit before the trailing search delay.
+        // Stop pressed during the delete loop → exit before the trailing wait.
         if (!this.state.running) break;
 
-        // Last-page short-circuit: if we've handled everything Discord said exists,
-        // skip the trailing wait + redundant empty-page confirmation search.
-        // (Page size isn't a reliable signal — Discord pages are content-bounded,
-        // so a sub-25 response can happen mid-run on long messages.)
+        // Last-page short-circuit: when the running totals match grandTotal,
+        // skip the trailing wait and the redundant empty-page confirmation
+        // search. Page size isn't a reliable signal — Discord pages are
+        // content-bounded, so a sub-25 response can happen mid-run on long
+        // messages.
         if (this.state.delCount + this.state.failCount >= this.state.grandTotal) {
           this.state.endReason = 'completed';
           break;
@@ -252,8 +300,9 @@ class UndiscordCore {
       }
       else if (this.state._skippedMessages.length > 0) {
         this.state.emptyPageRetry = 0; // got a non-empty page, reset retry counter
-        // The page has results but no deletable ones (e.g. all system messages).
-        // Advance the offset and check the next page; loop ends when a fully empty page returns.
+        // Page has results but no deletable ones (e.g. all system messages).
+        // Advance the offset and try the next page; the loop ends when a
+        // fully empty page returns.
         const oldOffset = this.state.offset;
         this.state.offset += this.state._skippedMessages.length;
         log.verb('Nothing deletable on this page, checking next page...');
@@ -262,9 +311,9 @@ class UndiscordCore {
       else {
         // Empty page. Decide whether to retry (search index lag is common) or stop (truly done).
 
-        // Import-mode short-circuit: an exhausted ImportSource means we've handed
-        // out every record we have. There's no search index to wait on, so the
-        // empty-page-retry budget doesn't apply — finalize immediately.
+        // Import-mode short-circuit: an exhausted ImportSource has emitted
+        // every record. There's no search index to wait on, so the empty-page
+        // retry budget doesn't apply — finalise immediately.
         if (this.options.importSource && this.options.importSource.exhausted) {
           if (this.state.delCount + this.state.failCount === 0 && this.state.grandTotal === 0) {
             this.state.endReason = 'no-matches';
@@ -289,8 +338,9 @@ class UndiscordCore {
         }
         else {
           if (this.state.delCount + this.state.failCount === 0 && this.state.grandTotal === 0) {
-            // First search returned zero — the filters didn't match anything in this target.
-            // Distinct from a successful run; surface it as its own end state.
+            // First search returned zero — the filters didn't match anything
+            // in this target. Distinct from a successful run; surfaced as its
+            // own end state.
             this.state.endReason = 'no-matches';
           } else if (this.state.emptyPageRetry >= max) {
             log.warn(`Gave up after ${max} consecutive empty pages.`, `(${expectedRemaining} message(s) still expected per grandTotal — may be unreachable due to search index lag, offset cap, or filter mismatch.)`);
@@ -304,9 +354,8 @@ class UndiscordCore {
         }
       }
 
-      // Wait before next page (gives Discord's search index time to catch up).
-      // Skipped in import mode — there's no API call to pace, so trailing waits
-      // would just stretch the wipe for no gain.
+      // Wait before next page — gives Discord's search index time to catch up.
+      // Skipped in import mode (no API call to pace).
       if (!this.options.importSource) {
         log.verb(`Waiting ${(this.options.searchDelay / 1000).toFixed(2)}s before next page...`);
         await this.#wait(this.options.searchDelay);
@@ -314,16 +363,18 @@ class UndiscordCore {
 
     } while (this.state.running);
 
-    // If a fresh run() bumped #runId while this loop was waiting, the end-summary
-    // and onStop belong to that new run — skip them here. Manual stop() does not
-    // bump #runId, so a user-triggered stop falls through to the summary below.
+    // If a fresh run() bumped #runId while this loop was waiting, the
+    // end-summary and onStop belong to that new run — skip them here.
+    // Manual stop() does not bump #runId, so a user-triggered stop falls
+    // through to the summary below.
     if (this.#runId !== myRunId) return;
 
     const endTime = new Date();
     const elapsed = msToHMS(endTime.getTime() - this.stats.startTime.getTime());
 
-    // Pick the end-summary log level/format from how the run ended. Each line gets
-    // its own log call so they stack vertically (and inherit the level's color).
+    // Pick the end-summary log level/format from how the run ended. Each line
+    // gets its own log call so they stack vertically and inherit the level's
+    // colour.
     if (this.state.endReason === 'no-matches') {
       log.warn('No matching messages found.');
       log.warn('The search filter returned zero results — no messages match the current parameters.');
@@ -349,8 +400,7 @@ class UndiscordCore {
     if (this.onStop) this.onStop(this.state, this.stats);
   }
 
-  // Aborts the run. Sets state.running=false and wakes any in-flight sleep so the
-  // main loop exits at its next checkpoint and prints the end-summary.
+  /** Aborts the run. Sets state.running=false and wakes any in-flight sleep so the main loop exits at its next checkpoint and prints the end-summary. */
   stop() {
     if (this.state.running) this.state.endReason = 'user-stopped';
     this.state.running = false;
@@ -358,21 +408,30 @@ class UndiscordCore {
     if (this.onStop) this.onStop(this.state, this.stats);
   }
 
-  // Estimated time remaining = perPostCost × remaining, where perPostCost is
-  // derived from observed page sizes:
-  //   perPageCost = searchDelay + (avgPostsInPage * deleteDelay)
-  //   perPostCost = perPageCost / avgPostsInPage
-  // Uses an avgN of 25 as a starting estimate before any productive page has been
-  // observed (Discord's pages are content-bounded so real values often fall lower);
-  // the running mean converges within a handful of pages.
-  // (Ping is intentionally out of this formula — its variance dwarfs deleteDelay
-  // on stable connections, and rate-limit bumps are reflected via options.deleteDelay
-  // already, so adding ping double-counts during throttle.)
+
+  // ========================================================================
+  // ETR + CONFIRMATION
+  // ========================================================================
+
+  /**
+   * Estimated time remaining = perPostCost × remaining, where perPostCost is
+   * derived from observed page sizes:
+   *   perPageCost = searchDelay + (avgPostsInPage * deleteDelay)
+   *   perPostCost = perPageCost / avgPostsInPage
+   * Uses an avgN of 25 as a starting estimate before any productive page has
+   * been observed (Discord's pages are content-bounded so real values often
+   * fall lower); the running mean converges within a handful of pages.
+   *
+   * Ping is intentionally out of this formula — its variance dwarfs
+   * deleteDelay on stable connections, and rate-limit bumps are reflected via
+   * options.deleteDelay already, so adding ping double-counts during throttle.
+   *
+   * Import mode: only deleteDelay applies — no per-page search cost — so the
+   * formula collapses to (deletes left × delay between deletes).
+   */
   calcEtr() {
     const remaining = this.state.grandTotal - this.state.delCount - this.state.failCount;
     if (remaining <= 0) { this.stats.etr = 0; return; }
-    // Import mode: only deleteDelay applies — there's no per-page search cost,
-    // so the formula collapses to (deletes left × delay between deletes).
     if (this.options.importSource) {
       this.stats.etr = remaining * this.options.deleteDelay;
       return;
@@ -382,8 +441,7 @@ class UndiscordCore {
     this.stats.etr = (perPageCost / avgN) * remaining;
   }
 
-  // Shows a browser confirm() dialog with the estimated count, ETA, and a content
-  // preview. Fires once per run (or once per batch); subsequent pages skip the prompt.
+  /** Shows a browser confirm() dialog with the estimated count, ETA, and a content preview. Fires once per run (or once per batch); subsequent pages skip the prompt. Returns true on confirm, false on decline. */
   async promptConfirmation() {
     if (!this.options.askForConfirmation) return true;
 
@@ -413,9 +471,12 @@ class UndiscordCore {
     }
   }
 
-  // Fetches the next page of matching messages from Discord's search API.
-  // Handles 202 (channel not yet indexed), 429 (rate limit, with delay bump),
-  // 401 (auth expired), 5xx (transient retry), and network errors.
+
+  // ========================================================================
+  // SEARCH
+  // ========================================================================
+
+  /** Fetches the next page of matching messages from Discord's search API into `state._searchResponse`. Handles 202 (channel not yet indexed), 429 (rate limit, with delay bump), 401 (auth expired), 5xx (transient retry), and network errors. */
   async search(transientAttempt = 0) {
     const base = this.options.guildId === '@me'
       ? `${API_BASE}/channels/${this.options.channelId}/messages/`  // DMs
@@ -447,13 +508,12 @@ class UndiscordCore {
           this.options.pinnedMode === 'only'    ? true  :
           this.options.pinnedMode === 'exclude' ? false : undefined],
         ['content', this.options.content || undefined],
-        // include_nsfw is a permissive flag — when true, age-gated channels return
-        // results alongside SFW ones (SFW channels are unaffected either way).
-        // Omitting it (or sending false) means Discord silently zero-results any
-        // NSFW channel in the queue. The "Exclude NSFW channels" checkbox in the
-        // panel inverts: excludeNsfw=false (default) sends include_nsfw=true, so
-        // NSFW channels return results; excludeNsfw=true omits the param so
-        // they silently zero-result.
+        // include_nsfw is permissive — when true, age-gated channels return
+        // results alongside SFW ones (SFW channels are unaffected). Omitting
+        // it (or sending false) silently zero-results NSFW channels in the
+        // queue. The "Exclude NSFW channels" checkbox inverts: excludeNsfw=
+        // false (default) sends include_nsfw=true; excludeNsfw=true omits
+        // the param so NSFW channels return nothing.
         ['include_nsfw', this.options.excludeNsfw ? undefined : true],
       ]), {
         headers: { 'Authorization': this.options.authToken }
@@ -474,10 +534,10 @@ class UndiscordCore {
       throw err;
     }
 
-    // not indexed yet
+    // 202: channel not indexed yet — wait the requested cooldown and retry.
     if (resp.status === 202) {
       let w = (await resp.json()).retry_after * 1000;
-      w = w || this.options.searchDelay; // Fix retry_after 0 — fall back to user's search delay
+      w = w || this.options.searchDelay; // retry_after 0 → use the configured search delay
       this.stats.throttledCount++;
       this.stats.throttledTotalTime += w;
       log.warn(`This channel isn't indexed yet. Waiting ${w}ms for discord to index it...`);
@@ -487,14 +547,14 @@ class UndiscordCore {
     }
 
     if (!resp.ok) {
-      // 429: rate limited
+      // 429: rate limited.
       if (resp.status === 429) {
         let w = (await resp.json()).retry_after * 1000;
         w = w || this.options.searchDelay;
 
         this.stats.throttledCount++;
         this.stats.throttledTotalTime += w;
-        // Bump effective delay (monotonic — never lower it). Successful searches will decay it back toward the user's baseline.
+        // Bump effective delay (monotonic — never lower it). Successful searches decay it back toward the user's baseline.
         this.options.searchDelay = Math.max(this.options.searchDelay, w);
         log.warn(`Being rate limited by the API for ${w}ms! Bumped search delay to ${this.options.searchDelay}ms (will decay back to ${this.state._userSearchDelay}ms on success).`);
         this.printStats();
@@ -505,7 +565,7 @@ class UndiscordCore {
         return await this.search();
       }
 
-      // 401: token expired or invalid — clearer message, no retry.
+      // 401: token expired or invalid — no retry.
       if (resp.status === 401) {
         this.state.endReason = 'auth-expired';
         this.state.running = false;
@@ -542,21 +602,19 @@ class UndiscordCore {
     return data;
   }
 
-  // Narrows the latest search response down to the messages this script will
-  // actually delete: drops system messages and (by default) pinned messages.
-  // Records the rest as "skipped" so the caller can advance the search offset past them.
+  /** Narrows the latest search response down to messages that will actually be deleted: drops system messages, applies the pinned-mode filter, then runs every excludeX post-filter. The remainder lands in `state._messagesToDelete`; everything dropped lands in `state._skippedMessages` so the caller can advance the search offset past them. */
   async filterResponse() {
     const data = this.state._searchResponse;
 
-    // grandTotal locks in the highest total_results ever seen and only ever grows.
-    // The per-search total_results shrinks as deletes succeed, but we keep the peak
-    // so the post-loop "deleted N/M" denominator reflects the original target size.
+    // grandTotal locks in the highest total_results ever seen and only ever
+    // grows. The per-search total_results shrinks as deletes succeed; the
+    // peak value is what the post-loop "deleted N/M" denominator reflects.
     const total = data.total_results;
     if (total > this.state.grandTotal) this.state.grandTotal = total;
 
-    // search returns conversation context (messages near the matched one); only the message
-    // marked hit:true is the actual match. .filter(Boolean) drops any convo missing a hit
-    // (defensive — Discord normally guarantees a hit per convo).
+    // Search returns conversation context (messages near the matched one);
+    // only the message marked hit:true is the actual match. .filter(Boolean)
+    // drops any conversation missing a hit.
     const discoveredMessages = data.messages.map(convo => convo.find(message => message.hit === true)).filter(Boolean);
 
     // Type 0 = regular user message; types 6-21 cover pins, joins, replies, etc.
@@ -564,30 +622,21 @@ class UndiscordCore {
     let messagesToDelete = discoveredMessages;
     messagesToDelete = messagesToDelete.filter(msg => msg.type === 0 || (msg.type >= 6 && msg.type <= 21));
 
-    // Pinned mode is enforced server-side via the `pinned` query param. Re-filter
-    // here as a safety net in case Discord ever returns a stray non-matching message.
+    // Pinned mode is enforced server-side via the `pinned` query param.
+    // Re-filter here as a safety net against stray non-matching responses.
     if (this.options.pinnedMode === 'exclude') {
       messagesToDelete = messagesToDelete.filter(msg => !msg.pinned);
     } else if (this.options.pinnedMode === 'only') {
       messagesToDelete = messagesToDelete.filter(msg => msg.pinned);
     }
 
-    // Exclude filters — Discord's search API has no "doesn't have" parameter, so
-    // these run client-side after the search response comes back. Each one drops
-    // messages that match the corresponding has-type, mirroring the Include grid.
+    // Exclude filters — Discord's search API has no "doesn't have" parameter,
+    // so these run client-side after the search response comes back. Each one
+    // drops messages matching the corresponding has-type.
     const opt = this.options;
-    if (opt.excludeContent) {
-      const term = opt.excludeContent.toLowerCase();
-      if (opt.excludeMatchMode === 'exact') {
-        // Word-boundary match: term must appear as a standalone word in the message.
-        // "cat" skips "I love my cat." but NOT "I love cats". Term is regex-escaped
-        // so special chars (.+*?[](){} etc.) match literally.
-        const escaped = opt.excludeContent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const re = new RegExp(`\\b${escaped}\\b`, 'i');
-        messagesToDelete = messagesToDelete.filter(msg => !re.test(msg.content || ''));
-      } else {
-        messagesToDelete = messagesToDelete.filter(msg => !(msg.content || '').toLowerCase().includes(term));
-      }
+    const contentMatch = buildContentMatcher(opt.excludeContent, opt.excludeMatchMode);
+    if (contentMatch) {
+      messagesToDelete = messagesToDelete.filter(msg => !contentMatch(msg.content));
     }
     if (opt.excludeLink) {
       messagesToDelete = messagesToDelete.filter(msg =>
@@ -621,10 +670,10 @@ class UndiscordCore {
         !(msg.message_snapshots?.length > 0) && msg.message_reference?.type !== 1);
     }
     if (opt.excludeMentions) {
-      // Skip @user is a multi-value list — applied client-side, so any number of
-      // mentioned users can be skipped per run (the API limitation only affects
-      // Include @user, which is single-value at search time).
-      const skipIds = String(opt.excludeMentions).split(/\s*,\s*/).filter(Boolean);
+      // Skip @user is a multi-value list applied client-side, so any number of
+      // mentioned users can be skipped per run. (Include @user is single-value
+      // because Discord's search `mentions=` param accepts only one ID.)
+      const skipIds = parseCsvList(opt.excludeMentions);
       if (skipIds.length) {
         messagesToDelete = messagesToDelete.filter(msg =>
           !(msg.mentions?.some(u => skipIds.includes(u.id))));
@@ -633,18 +682,9 @@ class UndiscordCore {
     if (opt.excludeMentionEveryone) {
       messagesToDelete = messagesToDelete.filter(msg => !msg.mention_everyone);
     }
-    if (opt.excludeExtensions?.length) {
-      // Drop messages whose attachments include any file with one of the
-      // listed extensions. The extension is taken from `filename` (live
-      // search) or falls back to `url` (import mode), lowercased, and matched
-      // against the user's set. Any single attachment match drops the whole
-      // message. Set lookup is O(1) per attachment.
-      const skipExts = new Set(opt.excludeExtensions);
-      messagesToDelete = messagesToDelete.filter(msg => !msg.attachments?.some(a => {
-        const name = a.filename || a.url || '';
-        const m = name.toLowerCase().match(/\.([a-z0-9]+)(?:[?#]|$)/);
-        return m && skipExts.has(m[1]);
-      }));
+    const extensionMatch = buildExtensionMatcher(opt.excludeExtensions);
+    if (extensionMatch) {
+      messagesToDelete = messagesToDelete.filter(msg => !extensionMatch(msg.attachments));
     }
 
     // Skipped messages still count toward the search offset for the next page.
@@ -653,20 +693,24 @@ class UndiscordCore {
     this.state._messagesToDelete = messagesToDelete;
     this.state._skippedMessages = skippedMessages;
 
-    // Feed the running mean of deletable posts per page — only on productive pages,
-    // since skipped-only pages don't follow the (search → N deletes) cost model.
+    // Feed the running mean of deletable posts per page — productive pages
+    // only, since skipped-only pages don't follow the (search → N deletes) cost model.
     if (messagesToDelete.length > 0) {
       this.stats.pagesProcessed++;
       this.stats.avgPostsInPage += (messagesToDelete.length - this.stats.avgPostsInPage) / this.stats.pagesProcessed;
     }
   }
 
-  // Issues one DELETE per message in the current page, with per-message retry on
-  // transient failures and a deleteDelay sleep between each.
+
+  // ========================================================================
+  // DELETE
+  // ========================================================================
+
+  /** Issues one DELETE per message in the current page, with per-message retry on transient failures and a deleteDelay sleep between each. */
   async deleteMessagesFromList() {
     const myRunId = this.#runId;
     for (let i = 0; i < this.state._messagesToDelete.length; i++) {
-      // Stop if user clicked stop OR a newer run has superseded this one.
+      // Stop pressed by user OR a newer run has superseded this one.
       if (this.#runId !== myRunId || !this.state.running) return log.error('Stopped by you!');
 
       const message = this.state._messagesToDelete[i];
@@ -702,9 +746,7 @@ class UndiscordCore {
     }
   }
 
-  // Deletes a single message via DELETE /channels/<id>/messages/<id>.
-  // Returns 'OK' (deleted), 'RETRY' (transient — caller may try again),
-  // or 'FAILED' (permanent — counted toward failCount).
+  /** Deletes a single message via DELETE /channels/<id>/messages/<id>. Returns 'OK' (deleted), 'RETRY' (transient — caller may try again), or 'FAILED' (permanent — counted toward failCount). */
   async deleteMessage(message) {
     const API_DELETE_URL = `${API_BASE}/channels/${message.channel_id}/messages/${message.id}`;
     let resp;
@@ -724,11 +766,11 @@ class UndiscordCore {
 
     if (!resp.ok) {
       if (resp.status === 429) {
-        // deleting messages too fast
+        // Deleting messages too fast.
         const w = (await resp.json()).retry_after * 1000;
         this.stats.throttledCount++;
         this.stats.throttledTotalTime += w;
-        // Bump effective delay (monotonic — never lower it). Successful deletes will decay it back toward the user's baseline.
+        // Bump effective delay (monotonic — never lower it). Successful deletes decay it back toward the user's baseline.
         this.options.deleteDelay = Math.max(this.options.deleteDelay, w);
         log.warn(`Being rate limited by the API for ${w}ms! Bumped delete delay to ${this.options.deleteDelay}ms (will decay back to ${this.state._userDeleteDelay}ms on success).`);
         this.printStats();
@@ -753,8 +795,8 @@ class UndiscordCore {
           const r = JSON.parse(body);
 
           if (resp.status === 400 && r.code === 50083) {
-            // 400 with code 50083 means the thread is archived. Bump the offset
-            // so the same message doesn't reappear on the next search page.
+            // 400 with code 50083 = thread is archived. Bump the offset so
+            // the same message doesn't reappear on the next search page.
             log.warn('Error deleting message (Thread is archived). Will increment offset so we don\'t search this in the next page...');
             this.state.offset++;
             this.state.failCount++;
@@ -785,14 +827,23 @@ class UndiscordCore {
     return 'OK';
   }
 
+
+  // ========================================================================
+  // STATS HELPERS
+  // ========================================================================
+
+  /** Records the request-send timestamp so afterRequest() can compute the round-trip ping. */
   beforeRequest() {
     this.#beforeTs = Date.now();
   }
+
+  /** Updates `stats.lastPing` (most recent round-trip) and `stats.avgPing` (EMA, 10% weight on the new sample). */
   afterRequest() {
     this.stats.lastPing = (Date.now() - this.#beforeTs);
     this.stats.avgPing = this.stats.avgPing > 0 ? (this.stats.avgPing * 0.9) + (this.stats.lastPing * 0.1) : this.stats.lastPing;
   }
 
+  /** Logs the current pacing values, ping samples, and rate-limit counters at verbose level. */
   printStats() {
     log.verb(`Delete delay: ${this.options.deleteDelay}ms, Search delay: ${this.options.searchDelay}ms`);
     log.verb(`Last ping: ${this.stats.lastPing}ms, Average ping: ${this.stats.avgPing | 0}ms`);

@@ -1,4 +1,3 @@
-// Userscript entry point. Tampermonkey/Violentmonkey runs this once when Discord
-// loads; initUI() injects the panel and FAB. No work happens until the user clicks Delete.
+/** Userscript entry point. The userscript manager runs this once on Discord page load; initUI() injects the panel and the floating action button. */
 import initUI from './undiscord-ui.js';
 initUI();

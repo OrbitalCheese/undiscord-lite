@@ -1,17 +1,24 @@
-// Tiny bundler — replaces rollup. Zero npm dependencies.
+// ============================================================================
+// BUNDLER
+// ----------------------------------------------------------------------------
+// Single-file ESM bundler with zero npm dependencies. Walks the import graph
+// from src/index.js, inlines .html / .css imports as string defaults, wraps
+// each module in an IIFE registered in a runtime cache, concatenates in
+// topological order, and prepends the userscript banner.
 //
-// What it does:
-//  1. Walks ESM imports starting from src/index.js
-//  2. Inlines .html / .css imports as string defaults
-//  3. Compacts CSS
-//  4. Wraps each module in a small IIFE registered in a runtime cache
-//  5. Concatenates in topological order, prepends the userscript banner
+// Supported ESM forms:
+//   - import X from 'spec'
+//   - import { a, b as c } from 'spec'
+//   - import X, { a, b } from 'spec'           (mixed default + named)
+//   - import 'spec'                            (side-effect)
+//   - export const | let | var | function | class | default
 //
-// Limitations (not present in this codebase, but worth knowing):
-//  - No dynamic imports
-//  - No re-exports (`export { x } from './y'`)
-//  - No namespace imports (`import * as ns from ...`)
-//  - Top-level `export` keyword must be at column 0 of the line
+// Not supported:
+//   - dynamic imports
+//   - re-exports (`export { x } from './y'`)
+//   - namespace imports (`import * as ns from ...`)
+//   - top-level `export` keywords not at column 0
+// ============================================================================
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,7 +29,17 @@ const ENTRY = path.join(ROOT, 'src', 'index.js');
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const OUT = path.join(ROOT, pkg.main);
 
-// ---------- Banner ----------
+
+// ============================================================================
+// USERSCRIPT BANNER
+// ----------------------------------------------------------------------------
+// Generates the // ==UserScript== / // ==/UserScript== block at the top of
+// the bundle. Required fields come from package.json directly; optional fields
+// (author, license, homepageURL, supportURL, downloadURL, updateURL) are
+// included only when present in package.json.userScript.
+// ============================================================================
+
+/** Renders a `{ key: value | [values] }` map into the UserScript banner format with aligned key columns. */
 function buildBanner(meta) {
   const longest = Math.max(...Object.keys(meta).map(k => k.length));
   const lines = [];
@@ -41,11 +58,6 @@ const BANNER = buildBanner({
   namespace:   pkg.userScript.namespace,
   match:       pkg.userScript.match,
   grant:       pkg.userScript.grant,
-  // Optional banner fields. Each is included only if present in package.json
-  // so the rendered metadata stays minimal when a field isn't configured.
-  //   author / license      — shown by Tampermonkey and required by Greasy Fork
-  //   homepageURL / supportURL — shown in the Tampermonkey install prompt
-  //   downloadURL / updateURL  — Tampermonkey checks these for new versions
   ...(pkg.userScript.author      && { author:      pkg.userScript.author }),
   ...(pkg.userScript.license     && { license:     pkg.userScript.license }),
   ...(pkg.userScript.homepageURL && { homepageURL: pkg.userScript.homepageURL }),
@@ -54,11 +66,21 @@ const BANNER = buildBanner({
   ...(pkg.userScript.updateURL   && { updateURL:   pkg.userScript.updateURL }),
 });
 
-// ---------- Module loader ----------
+
+// ============================================================================
+// MODULE LOADER
+// ----------------------------------------------------------------------------
+// Recursively reads source files starting from the entry, resolving every
+// `import` statement to an absolute path and registering each file as a module
+// in the `modules` map. .html / .css files are stored as string content; .js
+// files keep their raw source for later transformation.
+// ============================================================================
+
 const modules = new Map(); // id -> { id, abs, type, source|content, deps }
 
 const moduleId = (abs) => path.relative(ROOT, abs).replace(/\\/g, '/');
 
+/** Resolves an import specifier to an absolute file path. Tries the literal path, then `.js`/`.mjs` extensions, then `<dir>/index.js` for directory imports. */
 function resolveSpec(spec, fromAbs) {
   const fromDir = path.dirname(fromAbs);
   const abs = path.resolve(fromDir, spec);
@@ -73,6 +95,7 @@ function resolveSpec(spec, fromAbs) {
   throw new Error(`Cannot resolve "${spec}" from ${fromAbs}`);
 }
 
+/** Strips redundant whitespace from a CSS string (blank lines, post-`{` indent, post-`;` indent). */
 function compactCss(code) {
   return code
     .replace(/^\s*\n/gm, '')
@@ -81,6 +104,7 @@ function compactCss(code) {
     .replace(/;\s(\/\*.+\*\/)\n/g, '; $1 ');
 }
 
+/** Reads a source file and registers it in the `modules` map, recursing into every imported dependency. Returns the module record. */
 function loadModule(abs) {
   const id = moduleId(abs);
   if (modules.has(id)) return modules.get(id);
@@ -111,7 +135,16 @@ function loadModule(abs) {
   return mod;
 }
 
-// ---------- JS transformation ----------
+
+// ============================================================================
+// JS TRANSFORMATION
+// ----------------------------------------------------------------------------
+// Rewrites ESM `import` and `export` statements into CommonJS-style calls
+// against the runtime's `__require()` / `__exports` shims, so each module can
+// run inside an IIFE without the ESM module system.
+// ============================================================================
+
+/** Parses one named-import fragment ("a" or "a as b") into an object-destructuring fragment ("a" or "a: b"). */
 function parseNamed(s) {
   s = s.trim();
   if (!s) return '';
@@ -119,10 +152,11 @@ function parseNamed(s) {
   return parts.length === 2 ? `${parts[0].trim()}: ${parts[1].trim()}` : parts[0];
 }
 
+/** Rewrites a JS module's source — turns every `import` into a `__require()` call and every `export` into an `__exports.X = X` assignment. Returns the transformed source. */
 function transformJs(mod) {
   let src = mod.source;
 
-  // Map import specifier strings → resolved module IDs for this file
+  // Map import specifier strings → resolved module IDs for this file.
   const specToId = Object.fromEntries(mod.deps.map(d => [d.spec, d.id]));
   const reqExpr = (spec) => `__require(${JSON.stringify(specToId[spec])})`;
 
@@ -201,7 +235,14 @@ function transformJs(mod) {
   return tail ? `${src}\n${tail}` : src;
 }
 
-// ---------- Topological sort ----------
+
+// ============================================================================
+// TOPOLOGICAL SORT
+// ----------------------------------------------------------------------------
+// Orders modules so each one is emitted after its dependencies.
+// ============================================================================
+
+/** Returns module IDs in dependency order — every module appears after its deps. */
 function topoSort(rootId) {
   const visited = new Set();
   const order = [];
@@ -215,9 +256,18 @@ function topoSort(rootId) {
   return order;
 }
 
-// ---------- Emit ----------
+
+// ============================================================================
+// EMIT
+// ----------------------------------------------------------------------------
+// Wraps each module in an IIFE registered in the `__modules` cache, then
+// concatenates them inside the runtime shim and prepends the banner.
+// ============================================================================
+
+/** Indents every line of `s` by the given prefix. */
 const indent = (s, by = '  ') => s.split('\n').map(l => by + l).join('\n');
 
+/** Wraps a module into the `__modules[id] = (__exports) => { ... }` registration form expected by the runtime shim. */
 function emitModule(mod) {
   if (mod.type === 'string') {
     return `__modules[${JSON.stringify(mod.id)}] = (__exports) => {\n  __exports.default = ${JSON.stringify(mod.content)};\n};`;
@@ -235,7 +285,11 @@ function __require(id) {
   return exports;
 }`;
 
-// ---------- Build ----------
+
+// ============================================================================
+// BUILD
+// ----------------------------------------------------------------------------
+
 loadModule(ENTRY);
 const entryId = moduleId(ENTRY);
 const order = topoSort(entryId);

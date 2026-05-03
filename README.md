@@ -2,27 +2,58 @@
 
 Bulk-delete your messages in Discord servers, channels, and DMs. A zero-dependency rewrite of [victornpb/undiscord](https://github.com/victornpb/undiscord).
 
+**Contents:** [Preface](#preface) · [Features](#features) · [Install](#install) · [Usage](#usage) · [Import mode](#import-mode) · [How it works](#how-it-works) · [Privacy](#privacy) · [Build](#build) · [Disclaimer](#disclaimer) · [Credits](#credits)
+
 ## Preface
 
 This project is an extensive rewrite of the Undiscord project by victornpb originally made for my own personal use, now expanded for distribution to the general public. 
 
-The original lacked some serious core functionalities, polish, and was way too bloated and reliant on like a dozen+ node modules. This version is about 45x lighter and uses exactly ZERO. Everything is built in-house, and there is nothing to audit outside of what's in the repo. Nothing is obscured or imported, everything is auditable directly.  
+The original lacked some serious core functionalities, polish, and support for issues is pretty dead. It was also way too bloated and reliant on like a dozen+ node modules for the basic task it was performing. This version is about 30x lighter and uses exactly ZERO modules or imports. Everything is built in-house, and there is nothing to audit outside of what's in the repo. Nothing is obscured or imported, everything is auditable directly.  
 
 ⚠️ DON'T TRUST RANDOM CODE FROM THE INTERNET WITHOUT UNDERSTANDING WHAT IT DOES AND HOW IT DOES IT! ⚠️
 
-This impotus was the main reason for my own rewrite. 12+ dependencies, was far too much obfuscation for my taste. I didn't trust undiscord so I ripped it to atoms and reconstructed a version that I built, verified, and can PERSONALLY 100% trust.
+This impetus was the main reason for my own rewrite. 12+ dependencies, was far too much obfuscation for my taste. I didn't fully trust undiscord so I ripped it to atoms and reconstructed a version that I built, verified, and can PERSONALLY 100% trust with my precious sensitive Discord data.
 
 You aren't me, so you should be ⚠️*very*⚠️ wary of claims made by me. 
-I lied to people before, and I will do it again. For I am but a man.  
 
-That being said I tried my best to be as transparent as possible. 
-(Which could also be a lie to lull you into a false sense of security.)
+That being said I tried my best to be as transparent as possible. If I were ever going to publish some garbage I made it might as well be this thing that I like using. In the eternal words of Todd Howard, that will *surely* never come back to haunt me, it just works. 
+
+Honestly *astounding* that this all isn't a native Discord feature. You can fit a small country's population into a single server but comprehensive privacy options and >10 MB uploads are too much to ask for. 
+
+Deleting your account doesn't wipe the messages either, if you lose access to a server before cleaning they're just there forever being displayed at the owner's mercy. As the API needs channel-level access to work. Getting banned or kicked 403's you out of making the API request FOREVER. 
+
+"DELETED_USER says: Hi I'm Michael Michaelson!" 
+
+Peak anonymity. Worry not, there are options. For some.   
+
+Read:
+
+- [How long Discord keeps your information](https://support.discord.com/hc/en-us/articles/5431812448791-How-long-Discord-keeps-your-information) — official support article
+- [Local-law addenda](https://discord.com/terms/local-laws#5) — region-specific TOS clauses
+- [Privacy Policy](https://discord.com/privacy%20policy) — the headline document
+
+If you live in the EU (Yes, including the Yookay.), Switzerland, South Korea, or Brazil and are worried about what you posted in a server you no longer have access to. You can exercise your legal right to have your data DELETED directly. 
+
+I recommend you do this every now and again regardless. As deleting a message in discord does NOT force them to pry it from the hungry mouths of their growing AI datacenter abominations. 
+
+The best way to go about this is, especially in the EU, is to email the data protection officer directly at "dpo@discord.com". Ask the question to "privacy@discord.com" if you're unsure of how it works in your jurisdiction. Send the email from the email associated with your Discord account for faster service. 
+
+If you live in the US however…
+
+![Brother](readmeImages/image.png)
+
+You're fully at the mercy of the TOS of the super corpo Discord Inc. they have for countries without real data privacy laws. 
+
+They *might* honor your request if you say pretty please and write them a nice email.
+Maybe Venmo support a tip and include a prayer for their sickly mother. But other than that, the best you can do is prevent getting into that situation to begin with by wiping your messages at least once a week. And even then, It's doomed to train an AI for the next 2 years. 
+
+I only plan to update it if it breaks severely, there are enough safety guards built in to survive most anything with graceful degradation of the convenience features at most. 
 
 ## Features
 
-- **Zero npm dependencies.** The build is a single ~250-line Node script — no rollup, no plugins, no `node_modules`. The bundled userscript runs with no external dependencies, so there's nothing to audit beyond the file itself. Size went down from ~7mb to ~200kb. 
+- **Zero npm dependencies.** The build is a single ~310-line Node script — no rollup, no plugins, no `node_modules`. The bundled userscript runs with no external dependencies, so there's nothing to audit beyond the file itself. Size went down from ~7 MB to ~250 KB. 
 
-- **Multi-server / multi-channel batching** with `Add` / `Select` / `Delete` controls and a live queue display. The original technically supported batching — comma-separated channel IDs in one input for channels only— but it was basically undocumented and miserable to use manually. Dedicated buttons and a smarter queue let you mix entire-server wipes with channel-specific entries however you want.
+- **Multi-server / multi-channel batching** with `Add` / `Select` / `Delete` controls and a live queue display. The original technically supported batching — comma-separated channel IDs in one input for channels only — but it was basically undocumented and miserable to use manually. Dedicated buttons and a smarter queue let you mix entire-server wipes with channel-specific entries however you want.
 
 - **Point-and-click ID capture.** Hit `Select` on any field, then click an avatar / message / server icon / channel in Discord — the relevant ID drops into the field. Hold Shift to capture several in a row. Faster than Developer Mode + Copy ID for everything except cross-server lookups.
 
@@ -30,9 +61,9 @@ That being said I tried my best to be as transparent as possible.
 
 - **Robust rate-limit handling** — monotonic delay bumps with half-life decay back to your chosen baseline. The original bumped the delay on a 429 and never reset it, leaving you crawling for the rest of the run. Now it decays back toward your stepper value as deletes succeed.
 
-- **Auto-retry** on HTTP 5xx, network errors, and Discord's transient empty-page quirks. The original would die on a single empty page, an internet hiccup, or any Discord wobble. Each of those now has proper retry logic. Thank the Lord. 
+- **Auto-retry** on HTTP 5xx, network errors, and Discord's transient empty-page quirks. The original would die on a single empty page, an internet hiccup, or any Discord wobble. Each of those now has proper retry logic. 
 
-- **Robust user-flow handling** The entire thing has been monkey-proofed as much as possible. Invalid inputs are clamped, invalid dates get restored, user permissions are checked before trying to delete other people's messages, text-boxes autoformat the inputs properly, and everything has a hover title and an in-window help button that prints help to the log instead of redirecting to the github. 
+- **Robust user-flow handling** The entire thing has been monkey-proofed as much as possible. Invalid inputs are clamped, invalid dates get restored, user permissions are checked before trying to delete other people's messages, text-boxes autoformat the inputs properly, and everything has a hover title and an in-window help button that prints help to the log instead of redirecting to the GitHub. 
 
 - **Server-bar trash-icon injection** + `Ctrl+Shift+D` shortcut. The icon mounts inside Discord's left rail (between the Home/DM separator and the first server) and re-injects every second if React drops it. A floating action button in the bottom-right is the fallback when Discord's DOM doesn't expose the expected anchors. And if all that fails, Ctrl+Shift+D will always toggle the window so you're never soft-locked out by a UI problem. 
 
@@ -40,12 +71,11 @@ That being said I tried my best to be as transparent as possible.
 
 - **Defensive null handling**, run-instance fencing for stop+start races, log auto-trim at 1000 entries. Stop-and-resume during a wait used to corrupt the run; instance tracking and an interruptible sleep fix that. No more waiting for last pages either. 
 
-- **Filter overhaul**, split the filtering up into two parts. Search filter is the built-in filter within the Discord API. A very powerful and underused tool that could pick 100 messages out of a million, and return only that to the user for processing. It's not great at exclusion, only at narrowing down a lot within what's included. The job of excluding from deletions falls to the Delete filter. Which is a client side check against the set parameters. 
+- **Filter overhaul** — splits filtering across two stages. The **Search filter** taps Discord's own search API to narrow down *what gets returned* — a powerful, underused tool that can pick 100 matching messages out of a million for processing. But it's include-only — every toggle adds a constraint to what comes back; there's no way to say "except the ones matching X." The **Delete filter** handles that side: a client-side post-pass over the returned messages that drops the ones you want to spare. 
 
-Eg: 
-> 'I want to delete every @Alice message I ever made in the server, except the ones with my hilarious memes.'
+> **Example.** *"I want to delete every @Alice message I ever made in the server, except the ones with my hilarious memes."*
 >
->Set up @AliceUserID in mentions in the Search filter, this narrows down every single message in the server to say, 100 that contain an @Alice mention. Flick the images on in the Delete filter, and the script will go through those 100 posts, and skip deleting the ones with an image attachment. 
+> Put `@AliceUserID` in mentions on the **Search filter** — this narrows the server-wide message pool down to (say) 100 that contain an @Alice mention. Flick **Image** on in the **Delete filter**, and the script walks those 100 posts and skips deleting the ones with an image attachment.
 
 ## Install
 
@@ -55,7 +85,7 @@ Install a userscript manager — [Tampermonkey](https://www.tampermonkey.net/) (
 
 Then install the script via either path:
 
-- **Greasy Fork** *(easiest — once(If ever)published)* — visit the [Greasy Fork listing](https://greasyfork.org/) and click **Install this script**.
+- **Greasy Fork** *(easiest — once (if ever) published)* — visit the [Greasy Fork listing](https://greasyfork.org/) and click **Install this script**.
 - **Direct from GitHub** — click **[undiscord-lite.user.js](https://github.com/OrbitalCheese/undiscord-lite/raw/master/undiscord-lite.user.js)**. Your userscript manager will detect the metadata banner and prompt you to install.
 
 Open/reload Discord afterwards. A trash icon mounts in Discord's left rail just above the server list — click it (or press `Ctrl+Shift+D`) to open the panel. If Discord's DOM doesn't expose the expected anchors, a fallback floating action button appears in the bottom-right corner instead.
@@ -94,6 +124,12 @@ Hit **`▶︎ Delete`**. On the first job, a confirmation dialog shows you the e
 
 The trash icon (whether mounted in the server bar or shown as the fallback FAB) turns red while a run is active and shows a thin progress bar. Click **`🛑 Stop`** at any time — the wait between requests aborts immediately, no waiting for the current sleep to elapse.
 
+### Verify (the dry-run button)
+
+**`📋 Verify`** prints a structured snapshot of the current run config to the log without starting anything. Mode (live / import), queue contents grouped by server, every active filter on both sides, both intervals, and the current delay values. Useful when you've toggled a lot of switches and want to sanity-check what `▶︎ Delete` will actually do before you click it.
+
+The log isn't cleared — Verify is read-only and never destroys prior context. Sensitive IDs (author, server / channel, mentions, snowflake bounds) are dotted out under Streamer mode just like in the per-delete log.
+
 ### Settings
 
 Collapsible sidebar sections:
@@ -102,19 +138,21 @@ Collapsible sidebar sections:
 
 - **Search filter** — narrow what comes back from Discord's search: content text, attachment types (link / image / video / sound / sticker / poll / embed / forwarded), `@everyone / @here` pings, pinned mode, and a single `@user` mention.
 
-- **Delete filter** — drops messages from the queue *after* the search returns them: skip-text (substring or exact-word), the same set of attachment toggles, `@everyone / @here`, and a list of `@user` mentions to skip.
+- **Delete filter** — drops messages from the queue *after* the search returns them: skip-text (substring or exact-word), the same set of attachment toggles, `@everyone / @here`, a list of `@user` mentions to skip, and **Skip extension** — eight preset pills for the most-shared file types (`.jpg .png .mp4 .webm .pdf .docx .txt .zip`) plus a custom semicolon-separated textbox for anything else (`.psd;.dmg;.iso`). Whitespace trimmed, case normalized, leading dots optional. Any single attachment match drops the whole message. The **Skip Image / Skip Video** category toggles auto-tick the matching extension presets (`.jpg`+`.png` / `.mp4`+`.webm`); unticking any preset clears the parent toggle.
 
-> **Mention asymmetry.** The Search filter's <kbd>Include @user</kbd> field accepts **one** ID — Discord's `mentions=` query param only filters by a single mentioned user per request. The Delete filter's <kbd>Skip @user</kbd> field accepts **any number** of comma-separated IDs, because the skip is a client-side check after the response: every listed ID is matched against each message's mentions. So if you queue a 10k-message run and want to skip three @users, list all three on the Skip side and they'll all be honored in one pass.
+> **@Mentions asymmetry.** The Search filter's <kbd>Include @user</kbd> field accepts **one** ID — Discord's `mentions=` query param only filters by a single mentioned user per request. The Delete filter's <kbd>Skip @user</kbd> field accepts **any number** of comma-separated IDs, because the skip is a client-side check after the response: every listed ID is matched against each message's mentions. So if you queue a 10k-message run and want to skip three @users, list all three on the Skip side and they'll all be honored in one pass.
+
+> **Extension asymmetry.** Every other attachment toggle on the Search side (Link / Image / Video / Sound / Sticker / Poll / Embed / Forward) is a *server-side* filter — Discord's search API has a `has=<type>` query param for each one, so the narrowing happens before the response ever leaves Discord's database. **Skip extension has no Search-filter counterpart** because Discord's API doesn't expose extension-level filtering — there's no `has=jpg` or `extension=mp4`. So Skip extension is purely *client-side*: the script runs the normal search, then walks every returned message's attachment list locally and drops the matches before issuing the deletes. Same shape as the @user asymmetry above — server-side narrow-down has hard limits, client-side fine-grained skips fill the gaps.
 
 - **Messages interval** — min/max snowflake IDs to bound the deletion. Right-click a message in Discord → Copy Message ID. Useful for "delete everything I posted after this point" or "only the last week."
 
 - **Date interval** — datetime pickers, auto-converted to snowflakes. Ignored if you also fill in Messages interval — the snowflake range wins.
 
-- **Advanced settings** — search delay (default 45s) and delete delay (default 1s) steppers set your *baseline*. Click the arrows or type a value directly (auto-clamped to the field's range). The script auto-bumps both on 429s and decays them back toward your baseline as deletes succeed. Lower delays = faster, but more throttling.
+- **Delay settings** — search delay (default 45s) and delete delay (default 1s) steppers set your *baseline*. Click the arrows or type a value directly (auto-clamped to the field's range). The script auto-bumps both on 429s and decays them back toward your baseline as deletes succeed. Lower delays = faster, but more throttling.
 
 - **Import data export** — pre-load message IDs from your Discord data export and skip the search phase entirely (~3-5x faster on large wipes; no search-index-lag failure modes). See [Import mode](#import-mode) below.
 
-> Discord's UI requires dev mode to be on to copy raw message ID — only a message *link* can be copied otherwise. The texbox auto-strips the link down to the messageID, so you *can* just paste it in there with no problems.
+> Discord's UI requires dev mode to be on to copy raw message ID — only a message *link* can be copied otherwise. The textbox auto-strips the link down to the messageID, so you *can* just paste it in there with no problems.
 >
 > Around 30s is the practical floor for the search delay. Below that, Discord returns smaller batches per call until you're retrying more often than deleting. **40-45s search + 0.5–1s delete** is the sweet spot for consistent results.
 
@@ -137,6 +175,7 @@ If you've already requested your Discord data (User Settings → Privacy & Safet
 - Skip Link / Image / Video / Sound (URL-extension MIME inference against attachment list).
 - Skip extension (presets + custom semicolon-separated list) — extension is taken from the attachment URL.
 - Skip @user / Skip @everyone/@here — Discord's export keeps user mentions as `<@USERID>` (and `@everyone`/`@here` as literal text) inline in `Contents`, so a content regex recovers them.
+- **Exclude Server / Channel / DM-with-User** — three import-only fields right under the folder picker. Comma-separated snowflake IDs (Server accepts `@me` too — useful for "drop every DM"). Each has a `Select` button for point-and-click capture (Shift to capture several in a row) and a `Clear` button. Server matches against `guildId`, Channel against `channelId`, User against the channel's `recipients` list (so any group DM containing that user is dropped).
 - Delete delay (paces the actual DELETE requests).
 - Streamer mode (redacts message content *and* usernames in the log + confirmation preview).
 
@@ -149,7 +188,7 @@ If you've already requested your Discord data (User Settings → Privacy & Safet
 **Edge cases:**
 - Messages already deleted (by you, by mods, by Discord) → 404 on DELETE; counted as failed but harmless.
 - Channels you've since lost access to (banned, channel deleted, server deleted) → 403; same treatment.
-- Group DMs and one-on-one DMs are included if your export contains them.
+- Group DMs and one-on-one DMs are included if your export contains them. (Excluding just ONE participant of a group DM will skip the whole group.)
 
 **Privacy:** the export is parsed locally in your browser (`FileReader.text()`). Nothing is uploaded — there is no code path that sends imported data anywhere. The same `grep` rules in the [Privacy](#privacy) section catch any regression of this guarantee.
 
@@ -177,50 +216,55 @@ Every step that touches the network is one of four `fetch()` calls listed in the
 
 ## Privacy
 
-**Common sense warning** ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
-DONT TRUST ANYTHING I SAY IN THIS SECTION BLINDLY WITHOUT VERIFYING AND UNDERSTANDING IT FIRST.
-
-Running unverified code off the internet blindly is a recipe for disaster.  
-
-Independently verify all the claims made. 
-
-Don't run the code if you don't understand what it's doing, or don't trust the source.
-
-I am just some guy on the internet. I am NOT a trust-worthy source. 
+> ⚠️⚠️⚠️ **Common-sense warning** ⚠️⚠️⚠️
+>
+> **DON'T TRUST ANYTHING I SAY IN THIS SECTION BLINDLY WITHOUT VERIFYING AND UNDERSTANDING IT FIRST.**
+>
+> Running unverified code off the internet is a recipe for disaster. Independently verify every claim made below. Don't run the code if you don't understand what it's doing, or don't trust the source.
+>
+> I am just some guy on the internet. I am NOT a trust-worthy source.
 
 **Short version:** your auth token is never stored, never logged, and never sent anywhere except `discord.com`.
 
 The longer version, in case you want to verify it yourself (you should):
 
 - **Where the token comes from.** Read from Discord's own `localStorage` via a same-origin iframe (Discord blocks direct page access, but iframes inherit the parent origin's storage — standard workaround). It's the same token Discord's own client uses, from the same place.
-  - `getToken()` — [`src/helpers.js:69`](src/helpers.js#L69)
-  - iframe storage helper — [`src/helpers.js:58`](src/helpers.js#L58)
+  - `getToken()` — [`src/helpers.js:130`](src/helpers.js#L130)
+  - iframe storage helper — [`src/helpers.js:121`](src/helpers.js#L121)
 
 - **Where the token goes.** Held in a JavaScript variable (`options.authToken`) for the duration of the run. Used only as the `Authorization` header on `fetch()` calls to `https://discord.com/api/v9/...`. The codebase has exactly four `fetch()` call sites — search, delete, the DM-list lookup behind the `Add DMs` button, and the pre-flight permission check for multi-author batching — all four pointing at `discord.com`.
-  - `authToken` field declaration — [`src/undiscord-core.js:52`](src/undiscord-core.js#L52)
-  - search call — [`src/undiscord-core.js:419`](src/undiscord-core.js#L419) *(Authorization header at [line 447](src/undiscord-core.js#L447))*
-  - delete call — [`src/undiscord-core.js:688`](src/undiscord-core.js#L688) *(Authorization header at [line 690](src/undiscord-core.js#L690))*
-  - DM-list lookup — [`src/undiscord-ui.js:396`](src/undiscord-ui.js#L396) *(Authorization header at [line 397](src/undiscord-ui.js#L397))*
-  - permission pre-flight — [`src/undiscord-ui.js:1302`](src/undiscord-ui.js#L1302) *(Authorization header at [line 1303](src/undiscord-ui.js#L1303))*
-  - verify yourself: `grep -rn 'fetch(' src/` — exactly four hits
+  - `authToken` field declaration — [`src/undiscord-core.js:37`](src/undiscord-core.js#L37)
+  - search call — [`src/undiscord-core.js:488`](src/undiscord-core.js#L488) *(Authorization header at [line 519](src/undiscord-core.js#L519))*
+  - delete call — [`src/undiscord-core.js:755`](src/undiscord-core.js#L755) *(Authorization header at [line 757](src/undiscord-core.js#L757))*
+  - DM-list lookup — [`src/undiscord-ui.js:584`](src/undiscord-ui.js#L584) *(Authorization header at [line 585](src/undiscord-ui.js#L585))*
+  - permission pre-flight — [`src/undiscord-ui.js:1704`](src/undiscord-ui.js#L1704) *(Authorization header at [line 1705](src/undiscord-ui.js#L1705))*
+  - verify yourself — should return exactly four hits, all under `discord.com`:
+    ```bash
+    grep -rn 'fetch(' src/
+    ```
   - *Line numbers may drift between releases. If a link is off, search the file for the symbol — it's the most reliable anchor.*
 
 - **Where the token doesn't go.** Never written to `localStorage`, `IndexedDB`, cookies, files, or any other persistent storage. Never serialized into the log area. Never sent to GitHub, Greasy Fork, the author, an analytics service, or anything else — there is no code that talks to anything other than `discord.com`. Closing the tab clears it from memory.
-  - verify yourself: `grep -rEn 'localStorage\.setItem|indexedDB|document\.cookie|navigator\.sendBeacon' src/` — zero hits
+  - verify yourself — zero hits expected:
+    ```bash
+    grep -rEn 'localStorage\.setItem|indexedDB|document\.cookie|navigator\.sendBeacon' src/
+    ```
 
 - **No telemetry, no analytics, no update beacons.** Update checks happen at the userscript-manager layer (Tampermonkey, Violentmonkey, etc) if this repo ever gets updated, never from inside this script.
-  - verify yourself: `grep -rEn 'fetch\(|XMLHttpRequest|WebSocket|sendBeacon' src/` — only the four `discord.com` fetches above
+  - verify yourself — only the four `discord.com` fetches above should appear:
+    ```bash
+    grep -rEn 'fetch\(|XMLHttpRequest|WebSocket|sendBeacon' src/
+    ```
 
 - **No third-party code, fully self-contained.** Zero `npm` dependencies, zero `@require` directives, no remote script injection. `@grant none` means no `GM_*` privileges, no CSP bypass, no cross-origin reach beyond what a normal page script has. The bundle has no `<img>`, `<link>`, `<script>`, `@font-face`, `@import`, or `url(http...)` references — every icon is inline SVG, every font/emoji falls through to system fonts, every color is hardcoded hex.
   - userscript metadata banner — [`undiscord-lite.user.js:1-11`](undiscord-lite.user.js#L1-L11) (`@grant none`, no `@require`)
   - dependency manifest — [`package.json`](package.json) (no `dependencies` or `devDependencies` blocks)
 
 - **What gets logged locally.** The panel's log shows usernames, message content, attachment metadata, and message IDs as items are deleted (so you can confirm what's happening). It's rendered into the DOM in your own tab — not transmitted, not persisted, and wiped when you click **Clear Log** or close the tab. Auto-trims at 1000 entries.
-  - log renderer — [`src/undiscord-ui.js:1253`](src/undiscord-ui.js#L1253) (`printLog`)
-  - auto-trim limit — [`src/undiscord-ui.js:1248`](src/undiscord-ui.js#L1248) (`LOG_MAX_ENTRIES`)
+  - log renderer — [`src/undiscord-ui.js:1584`](src/undiscord-ui.js#L1584) (`printLog`)
+  - auto-trim limit — [`src/undiscord-ui.js:1581`](src/undiscord-ui.js#L1581) (`LOG_MAX_ENTRIES`)
 
-- **Auditable.** The bundled script is ~3,600 lines of readable JavaScript in one file ([`undiscord-lite.user.js`](undiscord-lite.user.js)). No minification, no obfuscation. Open it in any text editor before installing.
-
+- **Auditable.** The bundled script is ~3,750 lines of readable JavaScript in one file ([`undiscord-lite.user.js`](undiscord-lite.user.js)). No minification, no obfuscation. Open it in any text editor before installing.
 
 ## Build
 
@@ -237,7 +281,6 @@ Outputs `undiscord-lite.user.js` at the repo root.
 > ⚠️ Discord's terms of service forbid automated user-account actions (self-bots). Using this tool could result in account termination. Use at your own risk, on your own account, on your own data.
 
 This tool only deletes messages owned by the account it's run on (or messages the account has the *Manage Messages* privilege over) via the same HTTP endpoints Discord's UI uses.
-
 
 ## Credits
 

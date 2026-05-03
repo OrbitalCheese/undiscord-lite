@@ -1,6 +1,11 @@
-// Drag/resize for the panel window. Mouse only (desktop target).
-// Creates 8 invisible grab handles around the element edges plus uses an
-// existing handle (e.g. the header) for moving.
+// ============================================================================
+// PANEL DRAG / RESIZE
+// ----------------------------------------------------------------------------
+// Mouse-driven move and 8-directional resize for a fixed-positioned element.
+// Move binds to a caller-supplied handle (typically the panel header); resize
+// uses 8 invisible div edges/corners auto-injected around the element when
+// createHandlers is true.
+// ============================================================================
 
 const MOVE = 0;
 const RESIZE_T = 1;
@@ -12,6 +17,7 @@ const RESIZE_TR = RESIZE_T + RESIZE_R;
 const RESIZE_BL = RESIZE_B + RESIZE_L;
 const RESIZE_BR = RESIZE_B + RESIZE_R;
 
+/** Wires drag-to-move and 8-corner resize onto an element. `moveHandle` is the inner element that grabs for moving (header / title bar). */
 export default class DragResize {
   constructor({ elm, moveHandle, options }) {
     this.options = defaultArgs({
@@ -42,6 +48,7 @@ export default class DragResize {
   }
 }
 
+/** Binds mousedown / mousemove / mouseup on a handle to either move or resize the target element. Operation type is encoded in `op` (MOVE or a bitmask of RESIZE_T/B/L/R). */
 class Draggable {
   constructor(targetElm, handleElm, op, options) {
     Object.assign(this, options);
@@ -101,7 +108,7 @@ class Draggable {
 
     this._dragMoveHandler = (e) => {
       e.preventDefault();
-      // If the button isn't down (e.g. mouseup happened off-window), end the drag.
+      // Mouse button released off-window — end the drag here.
       if ((e.buttons || e.which) !== 1) return this._dragEndHandler();
       operation(e.clientX, e.clientY);
     };
@@ -116,6 +123,7 @@ class Draggable {
   }
 }
 
+/** Creates an element with the given attributes, appended to `parent` if supplied. */
 function createElement(tag, attrs, parent) {
   const elm = document.createElement(tag);
   if (attrs) for (const [k, v] of Object.entries(attrs)) elm.setAttribute(k, v);
@@ -123,6 +131,7 @@ function createElement(tag, attrs, parent) {
   return elm;
 }
 
+/** Shallow-merges defined keys from `options` into `defaults`, returning the mutated defaults. */
 function defaultArgs(defaults, options) {
   if (options && typeof options === 'object') {
     for (const k in defaults) {

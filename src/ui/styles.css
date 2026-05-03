@@ -1,14 +1,12 @@
-/* ----------------------------------------------------------------
- * Hardcoded palette — pinned values, NOT Discord theme variables.
- * Reading Discord's --background-* / --text-* / etc. used to make the
- * panel "match" the user's theme, but custom themes (BetterDiscord,
- * Vencord, etc.) routinely override those vars to wildly different
- * colors and broke the panel's look. Now: a self-contained dark
- * palette that ignores whatever theme Discord is running.
- *
- * Centralized at the top so the whole color scheme can be retuned in
- * one place without touching individual rules.
- * ---------------------------------------------------------------- */
+/* ============================================================================
+ * PALETTE
+ * ----------------------------------------------------------------------------
+ * Self-contained dark palette pinned to hardcoded hex values — does not read
+ * from Discord's --background-* / --text-* CSS variables, so custom themes
+ * (BetterDiscord, Vencord, etc.) cannot recolour the panel. Centralised here
+ * so the whole scheme can be retuned in one place without touching individual
+ * rules.
+ * ============================================================================ */
 #undiscord {
   --_u-bg-panel:        #2b2d31;
   --_u-bg-header:       #1e1f22;
@@ -197,10 +195,9 @@ body.undiscord-selecting * { cursor: crosshair !important; }
 
 /* Stepper rows for the delay controls. Compact buttons next to a read-only display. */
 #undiscord .stepper { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
-/* Input takes a fixed ~100px (~20% narrower than before), text left-aligned so
-   short values don't drift around. The freed horizontal space goes to the
-   stepper buttons (flex: 1) which grow to fill it equally. The input is
-   editable — users can type a value directly and it auto-clamps on commit. */
+/* Input is fixed at 100px and text-left-aligned so short values don't drift.
+   Stepper buttons (flex: 1) grow to fill the remaining horizontal space
+   equally. The input is editable — typed values auto-clamp on commit. */
 #undiscord .stepper input[type="text"] { flex: 0 0 100px; text-align: left; cursor: text; }
 #undiscord .stepper button { flex: 1; width: auto; min-width: 32px; padding: 0; font-weight: 700; }
 #undiscord .stepper-down { background-color: #722f37; }
@@ -770,12 +767,14 @@ body.undiscord-selecting * { cursor: crosshair !important; }
   cursor: nwse-resize;
 }
 
-/* ----------------------------------------------------------------
- * Server-bar trash icon — injected into Discord's left rail between
- * the DM/Home separator and the first server. Mimics Discord's server
- * icon shape-morph: circle at rest, rounded square on hover/active.
- * Lives outside #undiscord, so selectors are global.
- * ---------------------------------------------------------------- */
+/* ============================================================================
+ * SERVER-BAR TRASH ICON
+ * ----------------------------------------------------------------------------
+ * Injected into Discord's left rail between the DM/Home separator and the
+ * first server. Mimics Discord's server-icon shape-morph: circle at rest,
+ * rounded square on hover/active. Lives outside #undiscord, so selectors
+ * are global.
+ * ============================================================================ */
 #undiscord-server-btn {
   display: flex;
   align-items: center;
@@ -836,34 +835,42 @@ body.undiscord-selecting * { cursor: crosshair !important; }
   border-radius: 2px;
 }
 
-/* ---------- Streamer mode ---------- */
-
-/* When the Streamer mode toggle is on (panel root carries .streamer-on), every
-   input field that holds a Discord ID renders its value as dots so screen
-   recordings, streams, and shoulder-surfing don't leak user / server / channel
-   / message IDs. Placeholders are unaffected (they describe the field, not its
-   value). The text-content filter inputs (Include text, Skip text), date
-   pickers, and delay steppers stay readable — those don't carry sensitive IDs.
-   text-security is the unprefixed proposed standard; -webkit-text-security is
-   what Chromium / Discord's Electron client actually honours today. */
+/* ============================================================================
+ * STREAMER MODE
+ * ----------------------------------------------------------------------------
+ * When the Streamer mode toggle is on (panel root carries .streamer-on),
+ * every input field that holds a Discord ID renders its value as dots so
+ * screen recordings, streams, and shoulder-surfing don't leak user / server
+ * / channel / message IDs. Placeholders stay readable. The text-content
+ * filter inputs, date pickers, and delay steppers stay readable too — those
+ * don't carry sensitive IDs.
+ *
+ * `text-security` is the unprefixed proposed standard; `-webkit-text-security`
+ * is what Chromium / Discord's Electron client honours today.
+ * ============================================================================ */
 #undiscord.streamer-on input#authorId,
 #undiscord.streamer-on input#guildId,
 #undiscord.streamer-on input#channelId,
 #undiscord.streamer-on input#mentionsId,
 #undiscord.streamer-on input#excludeMentionsId,
 #undiscord.streamer-on input#minId,
-#undiscord.streamer-on input#maxId {
+#undiscord.streamer-on input#maxId,
+#undiscord.streamer-on input#importExcludeServers,
+#undiscord.streamer-on input#importExcludeChannels,
+#undiscord.streamer-on input#importExcludeUsers {
   -webkit-text-security: disc;
   text-security: disc;
 }
 
-/* ---------- Sidebar action group ---------- */
-
-/* Pinned at the top of the sidebar above all <details> sections. Two stacked
-   full-width buttons: the primary action (#start) on row 1 plus Clear Log on
-   row 2. The primary's text/class/handler toggle between "▶︎ Delete" (idle,
-   red) and "🛑 Stop" (running, red) so the layout never reflows when a run
-   starts — the same physical button just changes role. */
+/* ============================================================================
+ * SIDEBAR ACTION GROUP
+ * ----------------------------------------------------------------------------
+ * Pinned at the top of the sidebar above all <details> sections. Two stacked
+ * full-width buttons: the primary action (#start) on row 1, Clear Log on
+ * row 2. The primary's text / class / handler toggles between "▶︎ Delete"
+ * (idle, red) and "🛑 Stop" (running, red) — same physical button, two
+ * roles, no layout reflow when a run starts.
+ * ============================================================================ */
 #undiscord #sidebarActions {
   display: flex;
   flex-direction: column;
@@ -886,10 +893,14 @@ body.undiscord-selecting * { cursor: crosshair !important; }
   margin-bottom: 4px;
 }
 
-/* ---------- Footer toggles ---------- */
+/* ============================================================================
+ * FOOTER TOGGLES
+ * ----------------------------------------------------------------------------
+ * Streamer mode + Auto scroll inline labels in the footer row, plus the live
+ * elapsed/remaining readout pinned to the footer's left edge during a run.
+ * ============================================================================ */
 
-/* Streamer mode + Auto scroll inline labels in the footer row. Tighter spacing
-   and no uppercase styling (overrides the global label rule). */
+/* Tighter spacing and no uppercase styling (overrides the global label rule). */
 #undiscord .footer .footer-toggle {
   margin-bottom: 0;
   margin-right: 12px;
@@ -910,7 +921,14 @@ body.undiscord-selecting * { cursor: crosshair !important; }
   padding-left: 4px;
 }
 
-/* ---------- Import mode ---------- */
+/* ============================================================================
+ * IMPORT MODE
+ * ----------------------------------------------------------------------------
+ * Status chip + section greying when an export is loaded. The General queue
+ * and Search filter sections grey out (the import IS the queue); individual
+ * Skip-filter toggles whose data isn't carried by the export grey out
+ * separately via the .import-noop class.
+ * ============================================================================ */
 
 /* The "import mode" status chip — shown in the sidebar's badge row when an
    export is loaded. Discord-blurple, reads as a status indicator (no hover state). */
@@ -952,9 +970,7 @@ body.undiscord-selecting * { cursor: crosshair !important; }
 
 /* The Import section's summary uses the same gray as every other <summary>
    when idle. When an import is loaded, .import-mode bumps the weight to 600
-   so the active state is visually distinct without leaning on a stand-out
-   accent color (an inherited blue from the theme-link variable used to live
-   here and clashed with the rest of the sidebar). */
+   so the active state is visually distinct. */
 #undiscord.import-mode #sectionImport > summary {
   font-weight: 600;
 }
