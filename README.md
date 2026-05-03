@@ -6,25 +6,23 @@ Bulk-delete your messages in Discord servers, channels, and DMs. A zero-dependen
 
 ## Preface
 
-This project is an extensive rewrite of the Undiscord project by victornpb originally made for my own personal use, now expanded for distribution to the general public. 
+Started as a personal-use rewrite of victornpb's Undiscord, now expanded for distribution to the general public.
 
-The original lacked some serious core functionalities, polish, and support for issues is pretty dead. It was also way too bloated and reliant on like a dozen+ node modules for the basic task it was performing. This version is about 30x lighter and uses exactly ZERO modules or imports. Everything is built in-house, and there is nothing to audit outside of what's in the repo. Nothing is obscured or imported, everything is auditable directly.  
+The original lacked some serious core functionalities, polish, and support for issues is pretty dead. It was also way too bloated and reliant on like a dozen+ node modules for the basic task it was performing. This version is about 30x lighter and uses exactly ZERO modules or imports. Everything is built in-house. Nothing is obscured or imported, everything is auditable directly.
 
 ⚠️ DON'T TRUST RANDOM CODE FROM THE INTERNET WITHOUT UNDERSTANDING WHAT IT DOES AND HOW IT DOES IT! ⚠️
 
-This impetus was the main reason for my own rewrite. 12+ dependencies, was far too much obfuscation for my taste. I didn't fully trust undiscord so I ripped it to atoms and reconstructed a version that I built, verified, and can PERSONALLY 100% trust with my precious sensitive Discord data.
+That was the main impetus for my own rewrite — 12+ dependencies was far too much obfuscation for my taste. I ripped it to atoms and reconstructed a version that I built, verified, and can PERSONALLY 100% trust with my precious sensitive Discord data.
 
-You aren't me, so you should be ⚠️*very*⚠️ wary of claims made by me. 
+That said, I tried my best to be as transparent as possible. If I were ever going to publish some garbage I made, it might as well be this thing I like using. In the eternal words of Todd Howard, that will *surely* never come back to haunt me — it just works.
 
-That being said I tried my best to be as transparent as possible. If I were ever going to publish some garbage I made it might as well be this thing that I like using. In the eternal words of Todd Howard, that will *surely* never come back to haunt me, it just works. 
+Honestly *astounding* that this all isn't a native Discord feature. You can fit a small country's population into a single server but comprehensive privacy options and >10 MB uploads are too much to ask for.
 
-Honestly *astounding* that this all isn't a native Discord feature. You can fit a small country's population into a single server but comprehensive privacy options and >10 MB uploads are too much to ask for. 
+Deleting your account doesn't wipe the messages either: if you lose access to a server before cleaning, they're just there forever being displayed at the owner's mercy, since the API needs channel-level access to work. Getting banned or kicked 403's you out of making the API request FOREVER.
 
-Deleting your account doesn't wipe the messages either, if you lose access to a server before cleaning they're just there forever being displayed at the owner's mercy. As the API needs channel-level access to work. Getting banned or kicked 403's you out of making the API request FOREVER. 
+"DELETED_USER says: Hi I'm Michael Michaelson!"
 
-"DELETED_USER says: Hi I'm Michael Michaelson!" 
-
-Peak anonymity. Worry not, there are options. For some.   
+Peak anonymity. Worry not, there are options. For some.
 
 Read:
 
@@ -32,26 +30,25 @@ Read:
 - [Local-law addenda](https://discord.com/terms/local-laws#5) — region-specific TOS clauses
 - [Privacy Policy](https://discord.com/privacy%20policy) — the headline document
 
-If you live in the EU (Yes, including the Yookay.), Switzerland, South Korea, or Brazil and are worried about what you posted in a server you no longer have access to. You can exercise your legal right to have your data DELETED directly. 
+If you live in the EU (Yes, including the Yookay.), Switzerland, South Korea, or Brazil and are worried about what you posted in a server you no longer have access to, you can exercise your legal right to have your data DELETED directly.
 
-I recommend you do this every now and again regardless. As deleting a message in discord does NOT force them to pry it from the hungry mouths of their growing AI datacenter abominations. 
+I recommend you do this every now and again regardless, since deleting a message in Discord does NOT force them to pry it from the hungry mouths of their growing AI datacenter abominations.
 
-The best way to go about this is, especially in the EU, is to email the data protection officer directly at "dpo@discord.com". Ask the question to "privacy@discord.com" if you're unsure of how it works in your jurisdiction. Send the email from the email associated with your Discord account for faster service. 
+The best way to go about this, especially in the EU, is to email the data protection officer directly at `dpo@discord.com`. Ask the question to `privacy@discord.com` if you're unsure of how it works in your jurisdiction. Send the email from the address associated with your Discord account for faster service. Archive your correspondence. If they get caught ignoring legal obligations you'll have proof that you were harmed by their misconduct. 
 
 If you live in the US however…
 
 ![Brother](readmeImages/image.png)
 
-You're fully at the mercy of the TOS of the super corpo Discord Inc. they have for countries without real data privacy laws. 
+You're fully at the mercy of the TOS of the super corpo Discord Inc. they have for countries without real data privacy laws.
 
-They *might* honor your request if you say pretty please and write them a nice email.
-Maybe Venmo support a tip and include a prayer for their sickly mother. But other than that, the best you can do is prevent getting into that situation to begin with by wiping your messages at least once a week. And even then, It's doomed to train an AI for the next 2 years. 
+They *might* honor your request if you say pretty please and write them a nice email. Maybe Venmo support a tip and include a prayer for their sickly mother. But other than that, the best you can do is prevent getting into that situation to begin with — wipe your messages at least once a week. And even then, anything that's already in their training pipeline is doomed to ride out the next couple of years inside an AI dataset.
 
-I only plan to update it if it breaks severely, there are enough safety guards built in to survive most anything with graceful degradation of the convenience features at most. 
+I only plan to update it if it breaks severely, there are enough safety guards built in to survive most changes to Discord with graceful degradation of the convenience features while retaining core functionality.
 
 ## Features
 
-- **Zero npm dependencies.** The build is a single ~310-line Node script — no rollup, no plugins, no `node_modules`. The bundled userscript runs with no external dependencies, so there's nothing to audit beyond the file itself. Size went down from ~7 MB to ~250 KB. 
+- **Zero npm dependencies.** The build is a single ~310-line Node script — no rollup, no plugins, no `node_modules`. The bundled userscript runs with no external dependencies, so there's nothing to audit beyond the file itself. Size went down from ~7 MB to ~250 KB.
 
 - **Multi-server / multi-channel batching** with `Add` / `Select` / `Delete` controls and a live queue display. The original technically supported batching — comma-separated channel IDs in one input for channels only — but it was basically undocumented and miserable to use manually. Dedicated buttons and a smarter queue let you mix entire-server wipes with channel-specific entries however you want.
 
@@ -61,17 +58,17 @@ I only plan to update it if it breaks severely, there are enough safety guards b
 
 - **Robust rate-limit handling** — monotonic delay bumps with half-life decay back to your chosen baseline. The original bumped the delay on a 429 and never reset it, leaving you crawling for the rest of the run. Now it decays back toward your stepper value as deletes succeed.
 
-- **Auto-retry** on HTTP 5xx, network errors, and Discord's transient empty-page quirks. The original would die on a single empty page, an internet hiccup, or any Discord wobble. Each of those now has proper retry logic. 
+- **Auto-retry** on HTTP 5xx, network errors, and Discord's transient empty-page quirks. The original would die on a single empty page, an internet hiccup, or any Discord wobble. Each of those now has proper retry logic.
 
-- **Robust user-flow handling** The entire thing has been monkey-proofed as much as possible. Invalid inputs are clamped, invalid dates get restored, user permissions are checked before trying to delete other people's messages, text-boxes autoformat the inputs properly, and everything has a hover title and an in-window help button that prints help to the log instead of redirecting to the GitHub. 
+- **Robust user-flow handling.** The entire thing has been monkey-proofed as much as possible. Invalid inputs are clamped, invalid dates get restored, user permissions are checked before trying to delete other people's messages, text-boxes autoformat the inputs properly, and everything has a hover title plus an in-window help button that prints documentation to the log instead of redirecting to the GitHub.
 
-- **Server-bar trash-icon injection** + `Ctrl+Shift+D` shortcut. The icon mounts inside Discord's left rail (between the Home/DM separator and the first server) and re-injects every second if React drops it. A floating action button in the bottom-right is the fallback when Discord's DOM doesn't expose the expected anchors. And if all that fails, Ctrl+Shift+D will always toggle the window so you're never soft-locked out by a UI problem. 
+- **Server-bar trash-icon injection** + `Ctrl+Shift+D` shortcut. The icon mounts inside Discord's left rail (between the Home/DM separator and the first server) and re-injects every second if React drops it. A floating action button in the bottom-right is the fallback when Discord's DOM doesn't expose the expected anchors. And if all that fails, Ctrl+Shift+D will always toggle the window so you're never soft-locked out by a UI problem.
 
 - **Self-contained dark palette.** All colors are pinned to hardcoded hex values — the panel deliberately ignores Discord's CSS theme variables, so BetterDiscord/Vencord/custom themes can't make the UI look terrible. Single-source palette at the top of `styles.css` if you ever want to retune.
 
-- **Defensive null handling**, run-instance fencing for stop+start races, log auto-trim at 1000 entries. Stop-and-resume during a wait used to corrupt the run; instance tracking and an interruptible sleep fix that. No more waiting for last pages either. 
+- **Defensive null handling** — run-instance fencing for stop+start races, log auto-trim at 1000 entries, interruptible sleeps so a Stop click doesn't have to wait for the current delay to elapse.
 
-- **Filter overhaul** — splits filtering across two stages. The **Search filter** taps Discord's own search API to narrow down *what gets returned* — a powerful, underused tool that can pick 100 matching messages out of a million for processing. But it's include-only — every toggle adds a constraint to what comes back; there's no way to say "except the ones matching X." The **Delete filter** handles that side: a client-side post-pass over the returned messages that drops the ones you want to spare. 
+- **Filter overhaul** — splits filtering across two stages. The **Search filter** taps Discord's own search API to narrow down *what gets returned* — a powerful, underused tool that can pick 100 matching messages out of a million for processing. But it's include-only — every toggle adds a constraint to what comes back; there's no way to say "except the ones matching X." The **Delete filter** handles that side: a client-side post-pass over the returned messages that drops the ones you want to spare.
 
 > **Example.** *"I want to delete every @Alice message I ever made in the server, except the ones with my hilarious memes."*
 >
@@ -96,7 +93,7 @@ Open the panel with the trash icon or `Ctrl+Shift+D`. The panel is draggable by 
 
 ### Author ID
 
-The Author ID field determines whose messages get deleted. Click **`Me`** to auto-fill your own user ID. If you fail to put in an AuthorID it defaults to your own. You can paste a different user's ID, but Discord will only let you delete messages on channels where you have **Manage Messages** permission for that user (e.g. moderating your own server).
+The Author ID field determines whose messages get deleted. Click **`Me`** to auto-fill your own user ID. Leave it empty and it defaults to your own at run time. You can paste a different user's ID, but Discord will only let you delete messages on channels where you have **Manage Messages** permission for that user (e.g. moderating your own server).
 
 Comma-separate IDs (`id1,id2,id3`) to delete from multiple authors in one batch — the run expands to one job per (target × author). The pastebox auto-formats this when you paste in new ID's one at a time. Non-self authors require Manage Messages on each target server; a one-shot pre-flight check at the start of the batch verifies this and aborts early on any failure. In DMs you can only ever delete your own messages, so they spawn one self-author job regardless of how many IDs are listed.
 
@@ -114,7 +111,7 @@ Mix and match across as many servers as you want — order doesn't matter, the q
 
 **DMs.** Open the DM in Discord and click `Add` on Channel. The Server field auto-fills as `@me`, the Channel field auto-fills with the DM ID — both pulled from Discord's URL.
 
-**Wiping every DM at once.** Click the **`Add DMs`** button in the DMs fieldset. It calls Discord's own `GET /users/@me/channels` endpoint with your existing auth token and queues every DM (1:1 and group) currently open in your sidebar. Tick **Exclude group DMs** to leave group DMs out of the bulk add.
+**Wiping every DM at once.** Click the **`Add DMs`** button in the DMs fieldset. It calls Discord's own `GET /users/@me/channels` endpoint with your existing auth token and queues every DM (1:1 and group) currently open in your sidebar. Tick **Exclude group DMs** to skip the group ones.
 
 > Only currently-open DMs are queued. Conversations you've X'd out of the sidebar aren't returned by that endpoint — Discord considers them minimized rather than active. Re-open the DM in Discord first, then click `Add DMs` again. Or import message data for a comprehensive wipe.
 
@@ -122,7 +119,7 @@ Mix and match across as many servers as you want — order doesn't matter, the q
 
 Hit **`▶︎ Delete`**. On the first job, a confirmation dialog shows you the estimated message count, estimated time, and a preview of what's about to be deleted. Subsequent jobs in the same batch don't re-prompt.
 
-The trash icon (whether mounted in the server bar or shown as the fallback FAB) turns red while a run is active and shows a thin progress bar. Click **`🛑 Stop`** at any time — the wait between requests aborts immediately, no waiting for the current sleep to elapse.
+The trash icon (whether mounted in the server bar or shown as the fallback FAB) turns red while a run is active and shows a thin progress bar. Click **`🛑 Stop`** at any time — the in-flight delay aborts immediately, no need to sit through the current sleep.
 
 ### Verify (the dry-run button)
 
@@ -138,7 +135,9 @@ Collapsible sidebar sections:
 
 - **Search filter** — narrow what comes back from Discord's search: content text, attachment types (link / image / video / sound / sticker / poll / embed / forwarded), `@everyone / @here` pings, pinned mode, and a single `@user` mention.
 
-- **Delete filter** — drops messages from the queue *after* the search returns them: skip-text (substring or exact-word), the same set of attachment toggles, `@everyone / @here`, a list of `@user` mentions to skip, and **Skip extension** — eight preset pills for the most-shared file types (`.jpg .png .mp4 .webm .pdf .docx .txt .zip`) plus a custom semicolon-separated textbox for anything else (`.psd;.dmg;.iso`). Whitespace trimmed, case normalized, leading dots optional. Any single attachment match drops the whole message. The **Skip Image / Skip Video** category toggles auto-tick the matching extension presets (`.jpg`+`.png` / `.mp4`+`.webm`); unticking any preset clears the parent toggle.
+- **Delete filter** — drops messages from the queue *after* the search returns them: skip-text (substring or exact-word), the same set of attachment toggles, `@everyone / @here`, and a list of `@user` mentions to skip.
+  - **Skip extension** — eight preset pills for the most-shared file types (`.jpg .png .mp4 .webm .pdf .docx .txt .zip`) plus a custom semicolon-separated textbox for anything else (`.psd;.dmg;.iso`). Whitespace trimmed, case normalized, leading dots optional. Any single attachment match drops the whole message.
+  - **Skip Image / Skip Video** category toggles auto-tick the matching extension presets (`.jpg`+`.png` / `.mp4`+`.webm`); unticking any preset clears the parent toggle.
 
 > **@Mentions asymmetry.** The Search filter's <kbd>Include @user</kbd> field accepts **one** ID — Discord's `mentions=` query param only filters by a single mentioned user per request. The Delete filter's <kbd>Skip @user</kbd> field accepts **any number** of comma-separated IDs, because the skip is a client-side check after the response: every listed ID is matched against each message's mentions. So if you queue a 10k-message run and want to skip three @users, list all three on the Skip side and they'll all be honored in one pass.
 
@@ -148,11 +147,11 @@ Collapsible sidebar sections:
 
 - **Date interval** — datetime pickers, auto-converted to snowflakes. Ignored if you also fill in Messages interval — the snowflake range wins.
 
-- **Delay settings** — search delay (default 45s) and delete delay (default 1s) steppers set your *baseline*. Click the arrows or type a value directly (auto-clamped to the field's range). The script auto-bumps both on 429s and decays them back toward your baseline as deletes succeed. Lower delays = faster, but more throttling.
+- **Delay settings** — search delay (default 45s) and delete delay (default 1s) steppers set your *baseline*. Click the arrows or type a value directly (auto-clamped to the field's range). The script auto-bumps both on 429s and decays back toward it as deletes succeed. Lower delays = faster, but more throttling.
 
 - **Import data export** — pre-load message IDs from your Discord data export and skip the search phase entirely (~3-5x faster on large wipes; no search-index-lag failure modes). See [Import mode](#import-mode) below.
 
-> Discord's UI requires dev mode to be on to copy raw message ID — only a message *link* can be copied otherwise. The textbox auto-strips the link down to the messageID, so you *can* just paste it in there with no problems.
+> Discord's UI requires dev mode to be on to copy raw message IDs — only a message *link* can be copied otherwise. The textbox auto-strips the link down to the message ID, so you *can* just paste it in there with no problems.
 >
 > Around 30s is the practical floor for the search delay. Below that, Discord returns smaller batches per call until you're retrying more often than deleting. **40-45s search + 0.5–1s delete** is the sweet spot for consistent results.
 
@@ -166,7 +165,7 @@ If you've already requested your Discord data (User Settings → Privacy & Safet
 2. Unzip it locally. Inside is a `messages/` folder.
 3. Open the panel's **Import data export** section. Click **Select Folder...** and point at that `messages/` folder.
 4. The summary line fills in: total messages, channel count, oldest/newest timestamp.
-5. Set your Date or Messages interval if you want to bound the wipe (e.g. "only delete posts older than 1 year"). These are pre-applied client-side before the run starts.
+5. Set your Date or Messages interval if you want to bound the wipe (e.g. "only delete posts older than 1 year"). These are applied client-side before the run starts.
 6. Click **▶︎ Delete**. The General queue and Search filter sections grey out — the import IS the queue. The Delete filter stays interactive, but individual toggles that need data the export doesn't carry (Sticker, Poll, Embed, Forward) grey out individually.
 
 **What still applies in import mode:**
@@ -188,7 +187,7 @@ If you've already requested your Discord data (User Settings → Privacy & Safet
 **Edge cases:**
 - Messages already deleted (by you, by mods, by Discord) → 404 on DELETE; counted as failed but harmless.
 - Channels you've since lost access to (banned, channel deleted, server deleted) → 403; same treatment.
-- Group DMs and one-on-one DMs are included if your export contains them. (Excluding just ONE participant of a group DM will skip the whole group.)
+- Group DMs and one-on-one DMs are included if your export contains them. (Excluding just *one* participant of a group DM will skip the whole group.)
 
 **Privacy:** the export is parsed locally in your browser (`FileReader.text()`). Nothing is uploaded — there is no code path that sends imported data anywhere. The same `grep` rules in the [Privacy](#privacy) section catch any regression of this guarantee.
 
@@ -208,7 +207,7 @@ A walkthrough of what happens after you click `▶︎ Delete`. Every step lines 
    - **Wait** — sleeps `searchDelay` ms (default 45s) before the next page. Discord's search index lags real-time deletion; faster pacing returns smaller batches and triggers more retries. Skipped in import mode (no API call to pace).
    - **Repeat** — until the search returns empty (or the source is exhausted, or the empty-page retry budget runs out).
 
-4. **Rate-limit handling.** On HTTP 429, the script reads `retry_after`, sleeps that long, and bumps its effective delay up to that value. Each subsequent successful response halves the delay back toward the stepper baseline (half-life decay). On 5xx or network error, it retries with exponential backoff (1s, 2s, 4s).
+4. **Rate-limit handling.** On HTTP 429, the script reads `retry_after`, sleeps for that interval, and bumps its effective delay to match. Each subsequent successful response halves the delay back toward the stepper baseline (half-life decay). On 5xx or network error, it retries with exponential backoff (1s, 2s, 4s).
 
 5. **Stop.** Clicking 🛑 Stop sets `running=false` and aborts the in-flight sleep. The loop exits at its next checkpoint, prints the end-summary, and resets the UI. *(`stop()`.)*
 
@@ -228,7 +227,7 @@ Every step that touches the network is one of four `fetch()` calls listed in the
 
 The longer version, in case you want to verify it yourself (you should):
 
-- **Where the token comes from.** Read from Discord's own `localStorage` via a same-origin iframe (Discord blocks direct page access, but iframes inherit the parent origin's storage — standard workaround). It's the same token Discord's own client uses, from the same place.
+- **Where the token comes from.** Read from Discord's own `localStorage` via a same-origin iframe (Discord blocks direct page access, but iframes inherit the parent origin's storage — standard workaround). Same token Discord's own client uses.
   - `getToken()` — [`src/helpers.js:130`](src/helpers.js#L130)
   - iframe storage helper — [`src/helpers.js:121`](src/helpers.js#L121)
 
