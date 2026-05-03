@@ -33,6 +33,7 @@ const ui = {
   progressMain: null,
   progressIcon: null,
   topBarSlot: null, // unified status line above the log — idle hint or running progress
+  footerTime: null, // elapsed / remaining readout in the footer's left edge during a run
 };
 const $ = s => ui.undiscordWindow.querySelector(s);
 
@@ -46,6 +47,11 @@ let importedSet = null;
 // startAction to surface notices that would otherwise be wiped by the log-clear
 // it does just before kicking off the run. Consumed (and cleared) by onStart.
 let pendingStartNotice = null;
+
+// Current batch position, surfaced by core.onJob during a runBatch loop. Reset
+// to {1, 1} at the start of each run so single-job runs (which never call
+// onJob) display "Job 1/1" in the top bar instead of leftover values.
+let currentJobInfo = { i: 1, n: 1 };
 
 // Channel input uses ';' to separate per-server groups, ',' between channels in a group.
 // e.g. server="X,Y" + channel="C1,C2;C3" → X gets C1+C2, Y gets C3.
@@ -207,7 +213,7 @@ function cleanupOrphanedMe() {
   if (groups[idx].length > 0) return; // @me still has DM channels — keep it
   servers.splice(idx, 1);
   groups.splice(idx, 1);
-  log.warn('Dropped @me from the queue — server-wide @me isn\'t a valid wipe target. Use "Add DM\'s" or capture specific DMs with Select on Channel instead.');
+  log.warn('Dropped @me from the queue — server-wide @me isn\'t a valid wipe target. Use "Add DMs" or capture specific DMs with Select on Channel instead.');
   writeQueue(servers, groups);
 }
 
@@ -250,34 +256,11 @@ function removeChannel(server, channel) {
   writeQueue(servers, groups);
 }
 
+// Triggered after every queue mutation to refresh the top-bar synopsis.
+// (The old in-section #queueCounter readout was retired in favour of the
+// Verify button, which dumps the full per-server breakdown to the log on
+// demand instead of always being in the user's face.)
 function renderQueue() {
-  const { targets, orphans } = parseTargets();
-  const counter = $('#queueCounter');
-
-  // Group targets by server, preserving first-appearance order.
-  // Server-wide entries (empty channelId) leave channels at 0 — that means "all of them".
-  const groups = new Map(); // guildId -> channel count
-  for (const t of targets) {
-    if (!groups.has(t.guildId)) groups.set(t.guildId, 0);
-    if (t.channelId) groups.set(t.guildId, groups.get(t.guildId) + 1);
-  }
-
-  if (groups.size === 0 && !orphans) {
-    counter.innerHTML = '';
-  } else {
-    const cells = [];
-    let i = 0;
-    for (const count of groups.values()) {
-      const label = letterLabel(i++);
-      cells.push(`<span>Server: ${label}</span><span>|| Channels: ${count === 0 ? 'All' : count}</span>`);
-    }
-    if (orphans) {
-      cells.push(`<span class="qc-orphan">Orphans:</span><span class="qc-orphan">|| ${orphans} channel${orphans > 1 ? 's' : ''} without a server</span>`);
-    }
-    counter.innerHTML = cells.join('');
-  }
-
-  // Top bar reflects the same configuration — refresh it whenever the queue changes.
   renderTopBar();
 }
 
@@ -291,12 +274,11 @@ function renderTopBar() {
 
   if (importedSet) {
     const { messages, channelCount, oldestTs, newestTs } = importedSet;
-    const fmt = (ts) => ts ? new Date(ts).toISOString().slice(0, 7) : '—'; // YYYY-MM is enough for top-bar density
+    const fmt = (ts) => ts ? new Date(ts).toISOString().slice(0, 10) : '—';
     ui.topBarSlot.innerHTML =
-      `<span class="status-line">Ready: ` +
-      `${messages.length.toLocaleString()} message${messages.length === 1 ? '' : 's'} from ` +
-      `${channelCount} channel${channelCount === 1 ? '' : 's'} ` +
-      `(${fmt(oldestTs)} → ${fmt(newestTs)}) — import mode</span>`;
+      `<span class="status-line">Imported ${messages.length.toLocaleString()} message${messages.length === 1 ? '' : 's'} from ` +
+      `${channelCount} channel${channelCount === 1 ? '' : 's'}. ` +
+      `| Date start: ${fmt(oldestTs)} | Date end: ${fmt(newestTs)} |</span>`;
     return;
   }
 
@@ -307,21 +289,122 @@ function renderTopBar() {
     return;
   }
 
+  // Per-category counts. Servers = distinct guildIds (incl @me). Channels =
+  // entries with a specific channel ID. Server-wipes / Channel-wipes split the
+  // entries by kind: server-wide vs channel-specific. Authors = comma-separated
+  // count from the Author ID field; an empty field is read as 1 (defaults to
+  // self at run time).
   const servers = new Set(targets.map(t => t.guildId));
+  const channelWipes = targets.filter(t => t.channelId).length;
+  const serverWipes = targets.length - channelWipes;
+  const authorRaw = $('input#authorId').value.trim();
+  const authorCount = authorRaw ? authorRaw.split(/\s*,\s*/).filter(Boolean).length : 1;
+
   ui.topBarSlot.innerHTML =
     `<span class="status-line">Ready: ` +
-    `${servers.size} server${servers.size === 1 ? '' : 's'} · ` +
-    `${targets.length} target${targets.length === 1 ? '' : 's'} queued</span>`;
+    `Servers: ${servers.size} | ` +
+    `Channels: ${channelWipes} | ` +
+    `Server-wipes: ${serverWipes} | ` +
+    `Channel-wipes: ${channelWipes} | ` +
+    `Authors: ${authorCount} |</span>`;
 }
 
-// 0→A, 1→B, ..., 25→Z, 26→AA, 27→AB, ...
-function letterLabel(i) {
-  let s = '';
-  do {
-    s = String.fromCharCode(65 + (i % 26)) + s;
-    i = Math.floor(i / 26) - 1;
-  } while (i >= 0);
-  return s;
+// Click handler for the 📋 Verify button. Walks every form input and prints
+// a structured snapshot of the current run configuration to the log so the
+// user can sanity-check it before clicking Delete. Doesn't clear the log —
+// verify is a read-only action that should never destroy prior context.
+// Streamer mode redacts sensitive IDs (author, mentions, server / channel,
+// snowflake bounds) the same way it does in the message-preview log.
+function verifyAction() {
+  const sm = $('input#streamerMode').checked;
+  const dot = (v) => sm ? '••••' : v;
+
+  log.info('── CONFIG VERIFY ──');
+
+  if (importedSet) {
+    const { messages, channelCount, oldestTs, newestTs } = importedSet;
+    const fmt = (ts) => ts ? new Date(ts).toISOString().slice(0, 10) : '—';
+    log.info(`Mode: import (live-search filters bypassed)`);
+    log.info(`Imported set: ${messages.length.toLocaleString()} messages · ${channelCount} channel${channelCount === 1 ? '' : 's'} · ${fmt(oldestTs)} → ${fmt(newestTs)}`);
+  } else {
+    log.info(`Mode: live search`);
+    const authorVal = $('input#authorId').value.trim();
+    log.info(`Author ID: ${authorVal ? dot(authorVal) : '(empty — defaults to your own ID at run time)'}`);
+
+    const { targets, orphans } = parseTargets();
+    if (!targets.length) {
+      log.info('Queue: empty');
+    } else {
+      const grouped = new Map();
+      for (const t of targets) {
+        if (!grouped.has(t.guildId)) grouped.set(t.guildId, []);
+        if (t.channelId) grouped.get(t.guildId).push(t.channelId);
+      }
+      log.info(`Queue: ${grouped.size} server${grouped.size === 1 ? '' : 's'} / ${targets.length} target${targets.length === 1 ? '' : 's'}`);
+      for (const [server, channels] of grouped) {
+        const sLabel = server === '@me' ? '@me (DMs)' : `Server ${dot(server)}`;
+        if (channels.length === 0) {
+          log.info(`  · ${sLabel}: server-wide wipe`);
+        } else {
+          const chList = sm ? '' : ` — ${channels.join(', ')}`;
+          log.info(`  · ${sLabel}: ${channels.length} channel${channels.length === 1 ? '' : 's'}${chList}`);
+        }
+      }
+      if (orphans) log.warn(`  · ${orphans} orphan channel${orphans === 1 ? '' : 's'} without a parent server (will be skipped at run start).`);
+    }
+  }
+
+  // Search filter is meaningless in import mode (no API call to filter).
+  if (!importedSet) {
+    const search = $('input#search').value.trim();
+    const hasFlags = ['hasLink','hasImage','hasVideo','hasSound','hasSticker','hasPoll','hasEmbed','hasForward']
+      .filter(id => $(`input#${id}`).checked)
+      .map(id => id.slice(3).toLowerCase());
+    const mentionsVal = $('input#mentionsId').value.trim();
+    const mentionEv = $('input#mentionEveryone').checked;
+    const pinned = $('select#pinnedMode').value;
+    const excludeNsfw = $('input#excludeNsfw').checked;
+    const parts = [];
+    if (search) parts.push(`text "${search}"`);
+    if (hasFlags.length) parts.push(`has ${hasFlags.join(', ')}`);
+    if (mentionsVal) parts.push(`@user ${dot(mentionsVal)}`);
+    if (mentionEv) parts.push(`has @everyone / @here`);
+    if (pinned !== 'exclude') parts.push(`pinned: ${pinned}`);
+    // NSFW defaults to included; only flag it when the user opts to exclude.
+    if (excludeNsfw) parts.push(`exclude NSFW`);
+    log.info(`Search filter: ${parts.length ? parts.join(' · ') : '(none)'}`);
+  }
+
+  // Delete filter (some toggles still apply in import mode — content text
+  // and attachment-MIME inferences both work since the export carries that data).
+  const exSearch = $('input#excludeSearch').value.trim();
+  const exMatch = $('select#excludeMatchMode').value;
+  const exFlags = ['excludeLink','excludeImage','excludeVideo','excludeSound','excludeSticker','excludePoll','excludeEmbed','excludeForward']
+    .filter(id => $(`input#${id}`).checked)
+    .map(id => id.slice(7).toLowerCase());
+  const exMentionsVal = $('input#excludeMentionsId').value.trim();
+  const exMentionEv = $('input#excludeMentionEveryone').checked;
+  const delParts = [];
+  if (exSearch) delParts.push(`skip text "${exSearch}" (${exMatch})`);
+  if (exFlags.length) delParts.push(`skip ${exFlags.join(', ')}`);
+  if (exMentionsVal) delParts.push(`skip @users ${dot(exMentionsVal)}`);
+  if (exMentionEv) delParts.push(`skip @everyone / @here`);
+  log.info(`Delete filter: ${delParts.length ? delParts.join(' · ') : '(none)'}`);
+
+  // Intervals — Messages-interval (snowflakes) wins over Date-interval.
+  const minId = $('input#minId').value.trim();
+  const maxId = $('input#maxId').value.trim();
+  const minDate = $('input#minDate').value.trim();
+  const maxDate = $('input#maxDate').value.trim();
+  if (minId || maxId) {
+    log.info(`Messages interval: ${minId ? dot(minId) : '(channel start)'} → ${maxId ? dot(maxId) : '(now)'}`);
+    if (minDate || maxDate) log.info(`  · Date interval also set — Messages interval takes precedence at run time.`);
+  } else if ((minDate && minDate !== '2015-01-01T00:00') || maxDate) {
+    log.info(`Date interval: ${minDate || '2015-01-01T00:00'} → ${maxDate || '(now)'}`);
+  }
+
+  log.info(`Delay: search ${$('input#searchDelay').dataset.ms}ms · delete ${$('input#deleteDelay').dataset.ms}ms`);
+  log.info('── END VERIFY ──');
 }
 
 // Entry point. Called once on script load: injects the panel HTML/CSS, mounts
@@ -425,6 +508,7 @@ function initUI() {
   ui.progressMain = $('#progressBar');
   ui.progressIcon = ui.undiscordBtn.querySelector('progress');
   ui.topBarSlot = $('#topBarSlot');
+  ui.footerTime = $('#footerTime');
 
   $('#hide').onclick = toggleWindow;
   // The primary button is dual-purpose: Delete when idle, Stop when a run is
@@ -434,6 +518,7 @@ function initUI() {
     if (undiscordCore.state.running) stopAction();
     else startAction();
   };
+  $('button#verify').onclick = verifyAction;
   $('button#clear').onclick = () => ui.logArea.innerHTML = '';
   $('button#getAuthor').onclick = () => {
     const id = getAuthorId();
@@ -444,11 +529,11 @@ function initUI() {
   // input lives below under the Select bindings.
   // @me is rejected here: the search endpoint requires a specific channel ID
   // for DMs, so a server-wide entry of @me would create an unrunnable job.
-  // Use "Add DM's" in the DMs section instead — it queues each DM individually.
+  // Use "Add DMs" in the DMs section instead — it queues each DM individually.
   $('button#addGuild').onclick = () => {
     const server = getGuildId();
     if (server === '@me') {
-      return log.warn('"Add" on Server doesn\'t apply to the DM list — use "Add DM\'s" in the DMs section to queue all currently-open DMs.');
+      return log.warn('"Add" on Server doesn\'t apply to the DM list — use "Add DMs" in the DMs section to queue all currently-open DMs.');
     }
     if (server) addPair(server, '');
   };
@@ -487,20 +572,22 @@ function initUI() {
       return log.error('Network error fetching DMs:', err);
     }
 
-    const includeGroups = $('input#includeGroupDms').checked;
-    const dms = channels.filter(c => c.type === 1 || (includeGroups && c.type === 3));
+    const excludeGroups = $('input#excludeGroupDms').checked;
+    // Group DMs (type 3) are included by default; only excluded when the
+    // "Exclude group DMs" checkbox is on.
+    const dms = channels.filter(c => c.type === 1 || (!excludeGroups && c.type === 3));
     if (!dms.length) return log.info('No open DM channels found.');
 
     for (const c of dms) addPair('@me', c.id);
 
     const direct = dms.filter(c => c.type === 1).length;
     const group = dms.filter(c => c.type === 3).length;
-    const summary = includeGroups
-      ? `Queued ${dms.length} DM${dms.length === 1 ? '' : 's'} (${direct} direct, ${group} group).`
-      : `Queued ${direct} direct DM${direct === 1 ? '' : 's'} (group DMs excluded).`;
+    const summary = excludeGroups
+      ? `Queued ${direct} direct DM${direct === 1 ? '' : 's'} (group DMs excluded).`
+      : `Queued ${dms.length} DM${dms.length === 1 ? '' : 's'} (${direct} direct, ${group} group).`;
     log.info(summary);
   };
-  // Clear DM's: strip the @me server entry (and all its DM channels) from the queue.
+  // Clear DMs: strip the @me server entry (and all its DM channels) from the queue.
   $('button#delAllDms').onclick = () => {
     const { servers, groups } = readQueue($('input#guildId').value, $('input#channelId').value);
     const idx = servers.indexOf('@me');
@@ -550,6 +637,12 @@ function initUI() {
   bindMultiUserPaste($('input#authorId'),          'Author ID');
   bindSingleUserPaste($('input#mentionsId'),       'Mentions');
   bindMultiUserPaste($('input#excludeMentionsId'), 'Skip mentions');
+  // Import-mode exclusion inputs — same paste behavior (snowflake-shaped IDs
+  // append with dedup; non-ID clipboards fall through to native paste so the
+  // user can still type/paste freely if needed).
+  bindMultiUserPaste($('input#importExcludeServers'),  'Import: Exclude Server');
+  bindMultiUserPaste($('input#importExcludeChannels'), 'Import: Exclude Channel');
+  bindMultiUserPaste($('input#importExcludeUsers'),    'Import: Exclude DM User');
 
   // Point-and-click ID capture: each Select button arms a global click listener;
   // the next click on a Discord user/avatar/message/server-icon/channel extracts
@@ -561,6 +654,11 @@ function initUI() {
   bindSelector('selectExcludeMentions','excludeMentionsId','user',    'Skip mentions');
   bindSelector('selectMinId',          'minId',            'message', 'After message ID');
   bindSelector('selectMaxId',          'maxId',            'message', 'Before message ID');
+  // Import-mode exclusion Select buttons — *-multi types append to their bound
+  // input instead of going through addPair (which is the queue path).
+  bindSelector('selectImportExcludeServers',  'importExcludeServers',  'server-multi',  'Import: Exclude Server');
+  bindSelector('selectImportExcludeChannels', 'importExcludeChannels', 'channel-multi', 'Import: Exclude Channel');
+  bindSelector('selectImportExcludeUsers',    'importExcludeUsers',    'user',          'Import: Exclude DM User');
 
   // Clear buttons inside each text input. Server clear cascades to Channel
   // (channels are scoped to a parent server). Channel clear leaves Server alone.
@@ -569,8 +667,12 @@ function initUI() {
   bindClearButton('clearExcludeSearch',   'excludeSearch',     'Skip text');
   bindClearButton('clearMentions',        'mentionsId',        'Mentions');
   bindClearButton('clearExcludeMentions', 'excludeMentionsId', 'Skip mentions');
+  bindClearButton('clearExcludeExtensions', 'excludeExtensions', 'Skip extensions (custom)');
   bindClearButton('clearMinId',           'minId',             'After message ID');
   bindClearButton('clearMaxId',           'maxId',             'Before message ID');
+  bindClearButton('clearImportExcludeServers',  'importExcludeServers',  'Import: Exclude Server');
+  bindClearButton('clearImportExcludeChannels', 'importExcludeChannels', 'Import: Exclude Channel');
+  bindClearButton('clearImportExcludeUsers',    'importExcludeUsers',    'Import: Exclude DM User');
   // Server clear also clears Channel — Channel can't exist without its parent.
   $('button#clearGuild').onclick = () => {
     const g = $('input#guildId'), c = $('input#channelId');
@@ -602,23 +704,11 @@ function initUI() {
   bindDateClamp('minDate', 'After date');
   bindDateClamp('maxDate', 'Before date');
 
-  // Exclude-match pill: flips the label text alongside the pill state for clarity.
-  $('input#excludeMatchPill').addEventListener('change', (e) => {
-    $('#excludeMatchLabel').textContent = e.target.checked ? 'Substring' : 'Exact';
-  });
-
-  // Group-DMs pill: red (unchecked, default) = skip group DMs in the bulk add;
-  // green (checked) = include them. Label flips to match the active state.
-  $('input#includeGroupDms').addEventListener('change', (e) => {
-    $('#includeGroupDmsLabel').textContent = e.target.checked ? "Including all group DM's" : "Skipping all group DM's";
-  });
-
-  // NSFW pill: red (unchecked, default) = exclude age-gated channels from the
-  // search; green (checked) = include them. Affects the include_nsfw query
-  // param Discord's search API uses to gate NSFW results.
-  $('input#includeNsfw').addEventListener('change', (e) => {
-    $('#includeNsfwLabel').textContent = e.target.checked ? 'Include NSFW channels' : 'Exclude NSFW channels';
-  });
+  // (Exclude-match Substring/Exact is a native <select> dropdown, mirroring
+  // the Pinned mode dropdown nearby. No event wiring needed — the value is
+  // read directly in startAction. Exclude group DMs and Exclude NSFW are
+  // pill-style checkboxes with static labels; their values are read at run
+  // time in addAllDms / startAction respectively.)
 
   // Streamer mode: drives two separate effects.
   //   1. CSS — toggling .streamer-on on the panel root dots out every ID-bearing
@@ -651,6 +741,11 @@ function initUI() {
     bindMutex(`has${t}`, `exclude${t}`);
   }
   bindMutex('mentionEveryone', 'excludeMentionEveryone');
+
+  // Skip Image / Skip Video category toggles cascade onto their preset
+  // extension pills (and unchecking any child clears the parent).
+  bindCascade('excludeImage', ['jpg', 'png']);
+  bindCascade('excludeVideo', ['mp4', 'webm']);
 
   // redirect console logs to inside the window after setting up the UI
   setLogFn(printLog);
@@ -761,7 +856,7 @@ const HELP_TEXT = {
     ],
   },
   tabAdvanced: {
-    name: 'Advanced settings',
+    name: 'Delay settings',
     lines: [
       "Tune the per-page wait (<b>Search delay</b>) and per-delete pause (<b>Delete delay</b>).",
       "Both auto-bump on Discord's 429 rate-limit responses, then decay back toward your stepper value as subsequent requests succeed.",
@@ -781,7 +876,7 @@ const HELP_TEXT = {
       "To chain multiple people, comma-separate the IDs: <code>id1,id2,id3</code>. The run expands to one job per (target × author).",
       "Non-self authors require <i>Manage Messages</i> permission on their target server. A pre-flight check runs once at the top of the batch and aborts early if any pair lacks it.",
       "DMs are excluded from multi-author batching — Discord only lets you delete your own DM messages, so each DM target spawns one self-author job regardless of how many IDs are in the list.",
-      "<b>NSFW pill</b> (red/off &rarr; green/on): controls Discord's <code>include_nsfw</code> search flag. Default off means age-gated channels return zero results from the search API. Flip it on to include them.",
+      "<b>Exclude NSFW channels</b> checkbox (default off): when checked, age-gated channels return zero results from Discord's search API. Default behavior is to include them.",
     ],
   },
   serverId: {
@@ -810,8 +905,8 @@ const HELP_TEXT = {
   dms: {
     name: 'DMs',
     lines: [
-      "Click <b>Add DM's</b> to queue every 1:1 DM channel currently open in your sidebar. Group DMs are skipped by default — toggle the <b>group DMs</b> pill (red/off &rarr; green/on) to include them too.",
-      "Click <b>Clear DM's</b> to remove every queued DM at once.",
+      "Click <b>Add DMs</b> to queue every DM channel currently open in your sidebar — both 1:1 and group DMs by default. Check <b>Exclude group DMs</b> to leave group DMs out of the bulk add.",
+      "Click <b>Clear DMs</b> to remove every queued DM at once.",
       "DMs you've X'd out of the sidebar aren't returned by Discord's API — re-open them in Discord first if you need them included.",
       "Uses Discord's <code>GET /users/@me/channels</code> endpoint with your existing auth token.",
     ],
@@ -858,6 +953,17 @@ const HELP_TEXT = {
       "Skip messages that include the toggled type(s) — they survive the run.",
       "Mutually exclusive with the matching toggle in <b>Include attachment type</b>: checking one here automatically un-checks its counterpart on the search side, since both checked at once would always match nothing.",
       "Applied client-side after the search response.",
+    ],
+  },
+  excludeExtension: {
+    name: 'Skip extension',
+    lines: [
+      "Skip messages whose attachments include any file with one of the listed extensions.",
+      "<b>Quick toggles</b> — the 8 preset pills cover the most-shared file types on Discord: .jpg, .png, .mp4, .webm, .pdf, .docx, .txt, .zip. Toggle any green to skip messages with attachments of that type.",
+      "<b>Custom extensions</b> — for anything not in the presets, enter a semicolon-separated list (with or without leading dots), e.g. <code>.psd;.dmg;.iso</code>. Whitespace is trimmed; case is normalized; dots are optional.",
+      "<b>How matching works</b> — for each attachment on a message, the file extension is taken from its filename (live search) or its URL (import mode), lowercased, and checked against the merged set of presets + custom. Any single attachment match drops the whole message.",
+      "Applied client-side after the search response (or as part of the import-mode pre-pass) — works alongside the other Skip toggles.",
+      "Asymmetric on purpose — there is no Include-extension counterpart on the Search filter side, since Discord's search API only filters by attachment <i>category</i> (image / video / sound / etc.) and not specific extensions.",
     ],
   },
   excludeUser: {
@@ -928,11 +1034,37 @@ const HELP_TEXT = {
       "Pre-load message IDs from your Discord data export and skip the search phase entirely. Roughly <b>3-5x faster</b> than search-mode on large wipes, with no risk of \"search index lag\" empty-page failures.",
       "<b>How to get an export:</b> Discord settings &rarr; Privacy &amp; Safety &rarr; <b>Request All My Data</b>. Discord emails you a ZIP after a few minutes (sometimes a few days). Unzip it locally — inside is a <code>messages/</code> folder.",
       "<b>How to use it:</b> Click <b>Select Folder...</b> and pick that <code>messages/</code> folder. The summary line fills in (total messages, channel count, oldest/newest date). Set Date or Messages interval if you want to bound the wipe. Click <b>▶︎ Delete</b>.",
-      "<b>What still applies:</b> Date interval, Messages interval, Delete delay, Streamer mode. Pre-pass filters the imported set by date / snowflake before the run starts.",
-      "<b>What doesn't apply:</b> Author / Server / Channel / DMs queue, Search filter, Delete filter (most categories rely on data the export doesn't carry — mentions, embeds, pin status). Those sections grey out when an import is loaded.",
+      "<b>What still applies:</b> Date interval, Messages interval, Delete delay, Streamer mode, plus the Skip filters that have data to operate on — Skip text, Skip Link, Skip Image, Skip Video, Skip Sound, Skip extension (presets + custom), Skip @user, Skip @everyone/@here. All applied as a client-side pre-pass before the delete loop starts. Mention skips work because Discord's export stores user mentions inline in the content as <code>&lt;@USERID&gt;</code> and the literal <code>@everyone</code>/<code>@here</code> text. Extension matching uses the URL since the export doesn't carry filenames.",
+      "<b>What doesn't apply:</b> Author / Server / Channel / DMs queue, Search filter, and the Skip filters that need metadata the export doesn't carry — Skip Sticker, Skip Poll, Skip Embed, Skip Forward. Those individual toggles grey out when an import is loaded; if any are checked from before, a warning lists them at run start.",
       "<b>Edge cases:</b> Already-deleted messages return 404 (counted as failed but harmless). Channels you've lost access to (banned, deleted, etc) return 403 (same).",
       "<b>Privacy:</b> the export is parsed in-browser. Nothing is uploaded — there is no code path that sends imported data anywhere. The export contains every DM you've ever had; don't commit <code>messages/</code> to a git repo (the bundled <code>.gitignore</code> covers this).",
       "Click <b>Clear Import</b> to drop the loaded set and return to live-search mode.",
+    ],
+  },
+  importExcludeServer: {
+    name: 'Import — Exclude Server',
+    lines: [
+      "Drop entire <b>servers</b> from the import before the delete loop runs. Comma-separate any number of Server IDs.",
+      "Click <b>Select</b> and then click a server icon in Discord to capture its ID — hold Shift to capture several in a row. Pasting one or more snowflake-shaped IDs appends with deduplication.",
+      "Matches against each message's <code>guildId</code> as recorded in <code>channel.json</code>. <b>Use <code>@me</code></b> to drop every DM and group DM in one go (they all carry <code>guildId=@me</code>).",
+      "Servers in the export but not currently joined still match — the filter is purely client-side against the export data.",
+    ],
+  },
+  importExcludeChannel: {
+    name: 'Import — Exclude Channel',
+    lines: [
+      "Drop specific <b>channels</b> from the import. Comma-separate any number of channel IDs (works for guild channels, DMs, and group DMs alike — they all use the same snowflake format).",
+      "Click <b>Select</b> and then click a channel in the sidebar (or any message inside one) to capture its ID — hold Shift to capture several in a row.",
+      "Matches against each message's <code>channelId</code>. Independent of <b>Exclude Server</b> — a channel listed here is dropped even if its parent server isn't excluded.",
+    ],
+  },
+  importExcludeUser: {
+    name: 'Import — Exclude DM with User',
+    lines: [
+      "Drop <b>DMs</b> and <b>group DMs</b> that include the listed user(s) as participants. Comma-separate any number of User IDs.",
+      "Click <b>Select</b> and then click an avatar / username / message author in Discord to capture the User ID — hold Shift to capture several in a row.",
+      "Matches against the channel's <code>recipients</code> list (from <code>channel.json</code>). For group DMs, any single matched recipient drops the whole group.",
+      "<b>Guild messages are unaffected by design</b> — every message in your own data export was sent <i>by</i> you, so there's no other-author dimension to filter on. Use <b>Exclude Channel</b> if you want to spare specific guild channels.",
     ],
   },
 };
@@ -955,6 +1087,31 @@ function bindMutex(idA, idB) {
   b.addEventListener('change', () => { if (a.checked && b.checked) a.checked = false; });
 }
 
+// ---- Parent-with-extension-children cascade ----
+
+// Links a category-level Skip toggle (e.g. excludeImage) with the matching
+// extension preset pills (e.g. .jpg, .png). Two-way:
+//   - Parent toggled ON  → all children forced ON (cascade down).
+//   - Parent toggled OFF → all children forced OFF (cleanup, otherwise the
+//     user would have to uncheck three boxes to undo "image off").
+//   - Any child unchecked → parent unchecked (the parent claim "skip ALL of
+//     this category" is no longer true once a child is excluded).
+//   - Child checked alone → parent left untouched (would otherwise auto-check
+//     the parent every time the user picked a single extension manually,
+//     which would then re-cascade and force every other child on too).
+function bindCascade(parentId, childExts) {
+  const parent = $(`input#${parentId}`);
+  const children = childExts.map(ext => ui.undiscordWindow.querySelector(`input[data-ext="${ext}"]`));
+  parent.addEventListener('change', () => {
+    for (const c of children) c.checked = parent.checked;
+  });
+  for (const c of children) {
+    c.addEventListener('change', () => {
+      if (!c.checked && parent.checked) parent.checked = false;
+    });
+  }
+}
+
 // ---- Delay stepper helpers ----
 
 const SEARCH_MIN = 15000, SEARCH_MAX = 60000, SEARCH_STEP = 500, SEARCH_DEFAULT = 45000;
@@ -969,6 +1126,22 @@ function setDelayDisplay(inputId, ms) {
 
 function getDelayMs(inputId) {
   return parseInt($(`input#${inputId}`).dataset.ms);
+}
+
+// Reads every "Skip extension" toggle (preset pills carry data-ext) plus any
+// custom extensions typed into #excludeExtensions (semicolon-separated, dots
+// optional). Returns a deduplicated lowercase array of bare extensions, e.g.
+// ['pdf', 'docx', 'iso']. Empty array means "no extension filter active".
+// Both startAction (live search) and startImportAction (import pre-pass)
+// call this so the merged set is consistent across run modes.
+function readSkipExtensions() {
+  const presets = Array.from(ui.undiscordWindow.querySelectorAll('input[data-ext]:checked'))
+    .map(el => el.dataset.ext.toLowerCase());
+  const customRaw = $('input#excludeExtensions').value.trim();
+  const custom = customRaw
+    ? customRaw.split(/\s*;\s*/).map(s => s.replace(/^\./, '').toLowerCase()).filter(Boolean)
+    : [];
+  return [...new Set([...presets, ...custom])];
 }
 
 function bindStepper(inputId, min, max, step, defaultMs, stateKey) {
@@ -1157,10 +1330,10 @@ function startSelection(input, type, label, button) {
   resetSelectionTimeout();
 
   const target =
-    (type === 'user' || type === 'user-single') ? 'a user, avatar, or message author' :
-    type === 'server'  ? 'a server icon in the left rail' :
-    type === 'channel' ? 'a channel in the sidebar (or any message in it)' :
-                         'a message';
+    (type === 'user' || type === 'user-single')        ? 'a user, avatar, or message author' :
+    (type === 'server'  || type === 'server-multi')    ? 'a server icon in the left rail' :
+    (type === 'channel' || type === 'channel-multi')   ? 'a channel in the sidebar (or any message in it)' :
+                                                         'a message';
   log.info(`Select mode active for ${label}: click ${target} in Discord to capture its ID. Hold Shift to capture multiple in a row. Esc to cancel.`);
 }
 
@@ -1198,10 +1371,10 @@ function handleSelectionClick(e) {
 
   const t = selection.type;
   const id =
-    (t === 'user' || t === 'user-single') ? extractUserId(e.target)    :
-    t === 'message'                       ? extractMessageId(e.target) :
-    t === 'server'                        ? extractServerId(e.target)  :
-    t === 'channel'                       ? extractChannelId(e.target) : null;
+    (t === 'user' || t === 'user-single')          ? extractUserId(e.target)    :
+    t === 'message'                                ? extractMessageId(e.target) :
+    (t === 'server'  || t === 'server-multi')      ? extractServerId(e.target)  :
+    (t === 'channel' || t === 'channel-multi')     ? extractChannelId(e.target) : null;
   if (!id) {
     const typeLabel = selection.type === 'user-single' ? 'user' : selection.type;
     log.warn(`Couldn't extract a ${typeLabel} ID from the clicked element. Selection cancelled.`);
@@ -1239,8 +1412,12 @@ function handleSelectionKey(e) {
 // hold one ID (overwrite); message-ID inputs are single-value (overwrite).
 // Server and Channel captures are *additive* — they go through addPair() which
 // appends to the queue's grouped format and emits its own dedup/absorb/narrow logs.
+// The *-multi variants (server-multi / channel-multi) skip addPair entirely and
+// behave like 'user': append to the bound input's comma-separated list. Used by
+// the Import-mode "Exclude Server / Channel / User" inputs.
 function insertCapturedId(input, label, id, type) {
-  if (type === 'user') {
+  if (type === 'user' || type === 'server-multi' || type === 'channel-multi') {
+    const kindLabel = type === 'user' ? 'user' : type === 'server-multi' ? 'server' : 'channel';
     const list = input.value.trim().split(/\s*,\s*/).filter(Boolean);
     if (list.includes(id)) {
       log.info(`${id} is already in ${label} — skipped.`);
@@ -1248,7 +1425,7 @@ function insertCapturedId(input, label, id, type) {
     }
     list.push(id);
     input.value = list.join(',');
-    log.success(`Captured user ID ${id} → ${label}.`);
+    log.success(`Captured ${kindLabel} ID ${id} → ${label}.`);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   } else if (type === 'user-single') {
     const previous = input.value.trim();
@@ -1264,7 +1441,7 @@ function insertCapturedId(input, label, id, type) {
     // @me isn't a runnable server-wide target (the search endpoint requires a
     // specific channel ID for DMs). Same guard as the Add Server button uses.
     if (id === '@me') {
-      return log.warn('"Select" on Server captured @me, but server-wide @me isn\'t a valid wipe target — use "Add DM\'s" in the DMs section, or "Select" on Channel for a specific DM.');
+      return log.warn('"Select" on Server captured @me, but server-wide @me isn\'t a valid wipe target — use "Add DMs" in the DMs section, or "Select" on Channel for a specific DM.');
     }
     log.success(`Captured server ID ${id} → adding to queue (server-wide).`);
     addPair(id, ''); // addPair handles dedup/absorb logging
@@ -1418,7 +1595,12 @@ function bindCoreEvents() {
       const percent = Math.round(value / max * 100) + '%';
       const elapsed = msToHMS(Date.now() - stats.startTime.getTime());
       const remaining = msToHMS(stats.etr);
-      ui.topBarSlot.innerHTML = `<span class="status-line status-running">${percent} (${value}/${max}) · Elapsed ${elapsed} · Remaining ${remaining}</span>`;
+      ui.topBarSlot.innerHTML =
+        `<span class="status-line status-running">Deleting... ` +
+        `| (${value}/${max}) ${percent} ` +
+        `| Failures: ${state.failCount} ` +
+        `| Job ${currentJobInfo.i}/${currentJobInfo.n} |</span>`;
+      ui.footerTime.textContent = `Elapsed ${elapsed} · Remaining ${remaining}`;
       ui.progressIcon.setAttribute('max', max);
       ui.progressMain.setAttribute('max', max);
       ui.progressIcon.value = value;
@@ -1440,6 +1622,9 @@ function bindCoreEvents() {
     setDelayDisplay('deleteDelay', undiscordCore.options.deleteDelay);
   };
 
+  // Per-job batch position — fired by core.runBatch before each per-job run().
+  undiscordCore.onJob = (i, n) => { currentJobInfo = { i, n }; };
+
   undiscordCore.onStop = () => {
     const btn = $('button#start');
     btn.textContent = '▶︎ Delete';
@@ -1447,6 +1632,7 @@ function bindCoreEvents() {
     ui.undiscordBtn.classList.remove('running');
     if (ui.serverBarBtn) ui.serverBarBtn.classList.remove('running');
     ui.progressMain.style.display = 'none';
+    ui.footerTime.textContent = ''; // clear elapsed/remaining when idle
     // Restore the idle status (queue / import / empty hint).
     renderTopBar();
   };
@@ -1613,10 +1799,124 @@ async function startImportAction() {
   }
   if (minMs >= maxMs) return log.error('Date / message-interval bounds invert — After is at or after Before. Adjust or click "All".');
 
-  const filtered = importedSet.messages.filter(m => {
+  // Read every Skip filter, but only apply the ones with data the export
+  // carries. Sticker / Poll / Embed / Forward toggles are marked .import-noop
+  // in the UI (export has no metadata for those). Mention filters DO work in
+  // import mode — Discord stores user mentions inline in `Contents` as
+  // `<@id>` (or `<@!id>`), and the literal "@everyone"/"@here" text is
+  // preserved too — so we can recover both with a content regex.
+  const excludeContent = $('input#excludeSearch').value.trim();
+  const excludeMatchMode = $('select#excludeMatchMode').value;
+  const excludeLink = $('input#excludeLink').checked;
+  const excludeImage = $('input#excludeImage').checked;
+  const excludeVideo = $('input#excludeVideo').checked;
+  const excludeSound = $('input#excludeSound').checked;
+  const excludeMentionsRaw = $('input#excludeMentionsId').value.trim();
+  const excludeMentionsList = excludeMentionsRaw ? excludeMentionsRaw.split(/\s*,\s*/).filter(Boolean) : [];
+  const excludeMentionEveryone = $('input#excludeMentionEveryone').checked;
+  const excludeExtensions = readSkipExtensions();
+  const excludeExtensionsSet = excludeExtensions.length ? new Set(excludeExtensions) : null;
+
+  // Import-only exclusions: drop entire servers, channels, or DMs-with-users
+  // before any other filter runs. Each is a comma-separated snowflake list
+  // (server can also be `@me` for "all DMs"). Empty Set = filter is disabled.
+  const readIdSet = (id) => {
+    const raw = $(`input#${id}`).value.trim();
+    return raw ? new Set(raw.split(/\s*,\s*/).filter(Boolean)) : new Set();
+  };
+  const excludeServersSet  = readIdSet('importExcludeServers');
+  const excludeChannelsSet = readIdSet('importExcludeChannels');
+  const excludeUsersSet    = readIdSet('importExcludeUsers');
+
+  const noopToggles = [];
+  if ($('input#excludeSticker').checked) noopToggles.push('sticker');
+  if ($('input#excludePoll').checked)    noopToggles.push('poll');
+  if ($('input#excludeEmbed').checked)   noopToggles.push('embed');
+  if ($('input#excludeForward').checked) noopToggles.push('forward');
+  if (noopToggles.length) {
+    log.warn(`Import mode: ignoring filter${noopToggles.length === 1 ? '' : 's'} (${noopToggles.join(', ')}) — Discord's data export doesn't carry that data.`);
+  }
+
+  // Build matchers once (regex compilation per message would be wasteful).
+  let contentMatch = null;
+  if (excludeContent) {
+    if (excludeMatchMode === 'exact') {
+      const escaped = excludeContent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(`\\b${escaped}\\b`, 'i');
+      contentMatch = (s) => re.test(s);
+    } else {
+      const term = excludeContent.toLowerCase();
+      contentMatch = (s) => s.toLowerCase().includes(term);
+    }
+  }
+  // Mention matcher — `<@1234>` and `<@!1234>` (the legacy nick-mention form)
+  // both indicate a user mention in Discord's wire format. Combined into one
+  // regex so each message body is scanned only once regardless of how many
+  // user IDs are in the skip list.
+  let mentionMatch = null;
+  if (excludeMentionsList.length) {
+    const ids = excludeMentionsList.map(id => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    const re = new RegExp(`<@!?(?:${ids})>`);
+    mentionMatch = (s) => re.test(s);
+  }
+
+  // Per-category skip tally so the run-start log can show *where* the drops
+  // came from instead of a single opaque "X skipped" total. Each rejected
+  // record contributes to exactly one bucket — the first matching predicate
+  // wins (matches the short-circuit order of the original .filter()).
+  const skipReasons = {
+    servers: 0, channels: 0, dmUsers: 0,
+    dateInterval: 0,
+    text: 0, links: 0,
+    mentions: 0, everyone: 0,
+    attachments: 0, extensions: 0,
+  };
+  const filtered = [];
+  for (const m of importedSet.messages) {
+    // Import-only exclusions — checked first since matching here drops the
+    // record cheaply before any content / regex scanning.
+    if (excludeServersSet.size  && excludeServersSet.has(m.guildId))    { skipReasons.servers++;  continue; }
+    if (excludeChannelsSet.size && excludeChannelsSet.has(m.channelId)) { skipReasons.channels++; continue; }
+    if (excludeUsersSet.size && (m.type === 'DM' || m.type === 'GROUP_DM')
+        && m.recipientIds?.some(id => excludeUsersSet.has(id)))         { skipReasons.dmUsers++;  continue; }
+
+    // Date / snowflake bound
     const ts = new Date(m.timestamp).getTime();
-    return Number.isFinite(ts) && ts >= minMs && ts <= maxMs;
-  });
+    if (!Number.isFinite(ts) || ts < minMs || ts > maxMs) { skipReasons.dateInterval++; continue; }
+
+    // Skip text — drop messages whose content matches the term
+    const content = m.content || '';
+    if (contentMatch && contentMatch(content)) { skipReasons.text++; continue; }
+
+    // Skip Link — drop messages with any HTTP(S) URL in their content
+    // (the export doesn't carry embed metadata, so the regex on content is the
+    // only signal available)
+    if (excludeLink && /https?:\/\//i.test(content)) { skipReasons.links++; continue; }
+
+    // Skip attachment types — match the inferred MIME from the URL extension.
+    // Bundled into one bucket since the user's UI groups them as "Attachments".
+    if ((excludeImage && m.attachments?.some(a => a.content_type?.startsWith('image/')))
+     || (excludeVideo && m.attachments?.some(a => a.content_type?.startsWith('video/')))
+     || (excludeSound && m.attachments?.some(a => a.content_type?.startsWith('audio/')))) {
+      skipReasons.attachments++; continue;
+    }
+
+    // Skip @user — text-match against the inline `<@id>` / `<@!id>` form
+    if (mentionMatch && mentionMatch(content)) { skipReasons.mentions++; continue; }
+
+    // Skip @everyone / @here — Discord stores the literal text in content
+    if (excludeMentionEveryone && /@everyone|@here/.test(content)) { skipReasons.everyone++; continue; }
+
+    // Skip extension — match each attachment's extension (from URL in import
+    // mode; live mode uses filename via core's filterResponse) against the set
+    if (excludeExtensionsSet && m.attachments?.some(a => {
+      const name = a.url || '';
+      const em = name.toLowerCase().match(/\.([a-z0-9]+)(?:[?#]|$)/);
+      return em && excludeExtensionsSet.has(em[1]);
+    })) { skipReasons.extensions++; continue; }
+
+    filtered.push(m);
+  }
 
   if (filtered.length === 0) {
     return log.error(`Filters left zero messages from the import (had ${importedSet.messages.length}). Adjust Date or Messages interval, or click "All".`);
@@ -1630,6 +1930,7 @@ async function startImportAction() {
 
   ui.logArea.innerHTML = '';
 
+  currentJobInfo = { i: 1, n: 1 }; // import mode is always single-job
   undiscordCore.resetState();
   // Reset every search-mode field on options so nothing leaks across modes,
   // then plug in the import source. searchDelay isn't consulted in import mode
@@ -1654,13 +1955,37 @@ async function startImportAction() {
     excludeSticker: false, excludePoll: false, excludeEmbed: false, excludeForward: false,
     excludeMentions: '',
     excludeMentionEveryone: false,
+    excludeExtensions: [], // import pre-pass already trimmed by extension; blank here so filterResponse doesn't double-process
     searchDelay: 0,
     deleteDelay,
     streamerMode,
   };
 
   const skipped = importedSet.messages.length - filtered.length;
-  log.info(`Import-mode run: ${filtered.length.toLocaleString()} messages queued${skipped ? ` (${skipped.toLocaleString()} skipped by Date / Messages interval)` : ''}.`);
+  log.info(`Import-mode run: ${filtered.length.toLocaleString()} messages queued${skipped ? ` (${skipped.toLocaleString()} skipped)` : ''}.`);
+
+  // Breakdown lines — show every category that either (a) caught at least one
+  // record, or (b) the user explicitly configured (so a configured-but-zero
+  // filter is visible too, confirming "yes, your filter ran and matched 0").
+  // Categories that are neither configured nor matched stay hidden to avoid
+  // padding the log with ten zero lines on every plain-Date-only run.
+  const dateConfigured = (minMs > -Infinity) || (maxMs < Infinity);
+  const breakdown = [
+    ['Servers',                   skipReasons.servers,      excludeServersSet.size > 0],
+    ['Channels',                  skipReasons.channels,     excludeChannelsSet.size > 0],
+    ['DM users',                  skipReasons.dmUsers,      excludeUsersSet.size > 0],
+    ['Date / Messages interval',  skipReasons.dateInterval, dateConfigured],
+    ['Text',                      skipReasons.text,         !!contentMatch],
+    ['Links',                     skipReasons.links,        excludeLink],
+    ['Mentions',                  skipReasons.mentions,     !!mentionMatch],
+    ['@everyone / @here',         skipReasons.everyone,     excludeMentionEveryone],
+    ['Attachments',               skipReasons.attachments,  excludeImage || excludeVideo || excludeSound],
+    ['Extensions',                skipReasons.extensions,   !!excludeExtensionsSet],
+  ].filter(([, count, configured]) => count > 0 || configured);
+  if (breakdown.length) {
+    log.info('  Skipped breakdown:');
+    for (const [label, count] of breakdown) log.info(`    ${label}: ${count.toLocaleString()}`);
+  }
 
   try { await undiscordCore.run(); }
   catch (err) { log.error('CoreException', err); undiscordCore.stop(); }
@@ -1697,7 +2022,7 @@ async function startAction() {
 
   // general
   const authorId = authorInput.value.trim();
-  const includeNsfw = $('input#includeNsfw').checked;
+  const excludeNsfw = $('input#excludeNsfw').checked;
   // filter — include
   const content = $('input#search').value.trim();
   const hasLink    = $('input#hasLink').checked;
@@ -1713,7 +2038,7 @@ async function startAction() {
   const pinnedMode = $('select#pinnedMode').value;
   // filter — exclude (applied client-side after the search response)
   const excludeContent = $('input#excludeSearch').value.trim();
-  const excludeMatchMode = $('input#excludeMatchPill').checked ? 'substring' : 'exact';
+  const excludeMatchMode = $('select#excludeMatchMode').value;
   const excludeLink    = $('input#excludeLink').checked;
   const excludeImage   = $('input#excludeImage').checked;
   const excludeVideo   = $('input#excludeVideo').checked;
@@ -1724,13 +2049,14 @@ async function startAction() {
   const excludeForward = $('input#excludeForward').checked;
   const excludeMentions = $('input#excludeMentionsId').value.trim();
   const excludeMentionEveryone = $('input#excludeMentionEveryone').checked;
+  const excludeExtensions = readSkipExtensions();
   // message interval
   const minId = $('input#minId').value.trim();
   const maxId = $('input#maxId').value.trim();
   // date range
   const minDate = $('input#minDate').value.trim();
   const maxDate = $('input#maxDate').value.trim();
-  // advanced (stepper-backed; raw ms lives in dataset)
+  // delay settings (stepper-backed; raw ms lives in dataset)
   const searchDelay = getDelayMs('searchDelay');
   const deleteDelay = getDelayMs('deleteDelay');
   const streamerMode = $('input#streamerMode').checked;
@@ -1827,13 +2153,16 @@ async function startAction() {
 
   ui.logArea.innerHTML = '';
 
+  // Reset to 1/N — runBatch will overwrite via onJob in batch mode; single-job
+  // runs leave it alone so the top bar shows "Job 1/1" throughout.
+  currentJobInfo = { i: 1, n: jobs.length };
   undiscordCore.resetState();
   // Common options applied to every job. guildId/channelId/authorId are set per-job below.
   undiscordCore.options = {
     ...undiscordCore.options,
     authToken,
     authorId,
-    includeNsfw,
+    excludeNsfw,
     importSource: null, // defensive — make sure a stale import source from a prior run doesn't leak in
     minId: minId || minDateUsed,
     maxId: maxId || maxDateUsed,
@@ -1861,6 +2190,7 @@ async function startAction() {
     excludeForward,
     excludeMentions, // comma-separated string; core parses into a list at filter time
     excludeMentionEveryone,
+    excludeExtensions, // dedup'd lowercase array (presets ∪ custom textbox), see readSkipExtensions
     searchDelay,
     deleteDelay,
     streamerMode,

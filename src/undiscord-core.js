@@ -79,7 +79,8 @@ class UndiscordCore {
     excludeForward: null, // post-search filter: drop forwarded messages
     excludeMentions: null,        // post-search filter: drop messages @mentioning ANY of these user IDs (comma-separated)
     excludeMentionEveryone: null, // post-search filter: drop messages with @everyone / @here
-    includeNsfw: false, // server-side: when true, age-gated NSFW channels are included in search results; when false (default), Discord excludes them
+    excludeExtensions: null,      // post-search filter: drop messages whose attachments include any file with one of these extensions (array of lowercase strings, no leading dots)
+    excludeNsfw: false, // server-side: when true, age-gated NSFW channels are excluded from search results; when false (default), Discord includes them via include_nsfw=true
     searchDelay: null,
     deleteDelay: null,
     maxEmptyPageRetries: 5, // re-fetch this many times when grandTotal says more remain but the page is empty
@@ -122,6 +123,11 @@ class UndiscordCore {
   onStart = undefined;
   onProgress = undefined;
   onStop = undefined;
+  // Fires once per batch iteration BEFORE the per-job run() begins, with the
+  // 1-based job index and the batch total. Single-job runs (startAction with
+  // one queued target, or startImportAction) don't go through runBatch and
+  // never fire this — the UI defaults to displaying "Job 1/1" instead.
+  onJob = undefined;
 
   resetState() {
     this.state = {
@@ -154,6 +160,7 @@ class UndiscordCore {
       log.info('Starting job...', `(${i + 1}/${queue.length})`);
 
       this.options = { ...this.options, ...job };
+      if (this.onJob) this.onJob(i + 1, queue.length);
 
       await this.run(true);
       if (!this.state.running) break;
@@ -443,8 +450,11 @@ class UndiscordCore {
         // include_nsfw is a permissive flag — when true, age-gated channels return
         // results alongside SFW ones (SFW channels are unaffected either way).
         // Omitting it (or sending false) means Discord silently zero-results any
-        // NSFW channel in the queue. User-controlled via the NSFW pill.
-        ['include_nsfw', this.options.includeNsfw ? true : undefined],
+        // NSFW channel in the queue. The "Exclude NSFW channels" checkbox in the
+        // panel inverts: excludeNsfw=false (default) sends include_nsfw=true, so
+        // NSFW channels return results; excludeNsfw=true omits the param so
+        // they silently zero-result.
+        ['include_nsfw', this.options.excludeNsfw ? undefined : true],
       ]), {
         headers: { 'Authorization': this.options.authToken }
       });
@@ -622,6 +632,19 @@ class UndiscordCore {
     }
     if (opt.excludeMentionEveryone) {
       messagesToDelete = messagesToDelete.filter(msg => !msg.mention_everyone);
+    }
+    if (opt.excludeExtensions?.length) {
+      // Drop messages whose attachments include any file with one of the
+      // listed extensions. The extension is taken from `filename` (live
+      // search) or falls back to `url` (import mode), lowercased, and matched
+      // against the user's set. Any single attachment match drops the whole
+      // message. Set lookup is O(1) per attachment.
+      const skipExts = new Set(opt.excludeExtensions);
+      messagesToDelete = messagesToDelete.filter(msg => !msg.attachments?.some(a => {
+        const name = a.filename || a.url || '';
+        const m = name.toLowerCase().match(/\.([a-z0-9]+)(?:[?#]|$)/);
+        return m && skipExts.has(m[1]);
+      }));
     }
 
     // Skipped messages still count toward the search offset for the next page.

@@ -90,7 +90,8 @@ export async function parseExport(fileList) {
     // username is available from index.json's "Direct Message with NAME#0"
     // string. Group DMs may have a user-set `name` (or null for unnamed).
     const dmFriendName = (type === 'DM') ? extractDmFriendName(nameIndex[channelId]) : null;
-    const recipientCount = Array.isArray(channelMeta.recipients) ? channelMeta.recipients.length : 0;
+    const recipientIds = Array.isArray(channelMeta.recipients) ? channelMeta.recipients.map(String) : [];
+    const recipientCount = recipientIds.length;
 
     let raw;
     try { raw = JSON.parse(await slot.messages.text()); }
@@ -104,7 +105,7 @@ export async function parseExport(fileList) {
     parsedChannels++;
     for (const m of raw) {
       const messageId = m.ID ?? m.id;
-      const timestamp = m.Timestamp ?? m.timestamp;
+      const timestamp = normalizeExportTs(m.Timestamp ?? m.timestamp);
       const content   = m.Contents ?? m.content ?? '';
       const attachRaw = m.Attachments ?? m.attachments ?? '';
 
@@ -124,6 +125,7 @@ export async function parseExport(fileList) {
         type,
         dmFriendName,
         recipientCount,
+        recipientIds, // string IDs of every channel participant — used by the import-mode "Exclude User" filter for DM/GROUP_DM matching
         messageId: String(messageId),
         timestamp,
         content,
@@ -145,6 +147,23 @@ export async function parseExport(fileList) {
 // when the user shift-selects files without folder support.
 function relPath(file) {
   return file.webkitRelativePath || file.name;
+}
+
+// Discord exports timestamps as "YYYY-MM-DD HH:MM:SS" (no `T`, no `Z`) — and
+// the values are UTC, verified against the snowflake the message ID encodes.
+// Plain `new Date("YYYY-MM-DD HH:MM:SS")` in JavaScript parses that as LOCAL
+// time, which silently shifts every imported timestamp by the user's TZ
+// offset. Normalising to ISO-with-Z here ensures every downstream parse
+// (filter pre-pass, oldest/newest summary, per-delete log timestamps) gets
+// the correct UTC instant. Already-ISO inputs (T-separator or trailing Z /
+// numeric offset) are passed through unchanged so future export formats keep
+// working without a code change here.
+function normalizeExportTs(str) {
+  if (!str || typeof str !== 'string') return str;
+  // Has T separator OR trailing Z OR ±HH:MM offset → trust it.
+  if (/T/.test(str) || /Z$/.test(str) || /[+-]\d\d:?\d\d$/.test(str)) return str;
+  // SQL-style "YYYY-MM-DD HH:MM:SS" → ISO UTC.
+  return str.replace(' ', 'T') + 'Z';
 }
 
 // index.json's value for a DM channel looks like "Direct Message with USER#0".

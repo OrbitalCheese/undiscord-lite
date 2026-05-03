@@ -267,9 +267,9 @@ body.undiscord-selecting * { cursor: crosshair !important; }
     cursor: pointer;
 }
 
-/* Pill-style on/off toggle. Replaces every native checkbox visual inside the panel:
-   red when off, green when on. The .has-grid override below tightens margin in
-   the dense 2-column grids. */
+/* Pill-style on/off toggle. Replaces every native checkbox visual inside the
+   panel: red when off, green when on. The .has-grid override below tightens
+   margin in the dense 2-column grids. */
 #undiscord input[type="checkbox"] {
     appearance: none;
     -webkit-appearance: none;
@@ -299,28 +299,6 @@ body.undiscord-selecting * { cursor: crosshair !important; }
 }
 #undiscord input[type="checkbox"]:checked { background-color: #3a7d4d; }
 #undiscord input[type="checkbox"]:checked::after { transform: translateX(18px); }
-
-#undiscord #queueCounter {
-    display: grid;
-    grid-template-columns: max-content max-content;
-    column-gap: 14px;
-    row-gap: 2px;
-    margin: 8px 0 12px;
-    padding: 6px 10px;
-    border-radius: 4px;
-    background: var(--_u-bg-input);
-    color: var(--_u-text);
-    font-family: Consolas, Liberation Mono, Menlo, Courier, monospace;
-    font-size: 12px;
-}
-#undiscord #queueCounter:empty {
-    margin: 0;
-    padding: 0;
-    background: none;
-}
-#undiscord #queueCounter .qc-orphan {
-    color: var(--_u-btn-danger);
-}
 
 #undiscord .input {
     font-size: 16px;
@@ -459,6 +437,13 @@ body.undiscord-selecting * { cursor: crosshair !important; }
 
 #undiscord .danger {
     background-color: var(--_u-btn-danger);
+}
+
+/* Verify-button accent — a darker navy than the existing #2c5d8e Select-button
+   blue so it reads as a distinct, secondary action and doesn't get mistaken
+   for a Select-mode trigger. */
+#undiscord .verify-mode {
+    background-color: #1e4470;
 }
 
 /* Scrollbar */
@@ -914,6 +899,17 @@ body.undiscord-selecting * { cursor: crosshair !important; }
   cursor: pointer;
 }
 
+/* Live elapsed/remaining readout — populated by onProgress, cleared by onStop.
+   Tied to the LEFT edge of the footer (the spacer pushes the toggles right).
+   Empty when idle, monospace+muted when active so the digits don't shift. */
+#undiscord .footer #footerTime {
+  font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 12px;
+  color: var(--_u-text-muted);
+  letter-spacing: 0.2px;
+  padding-left: 4px;
+}
+
 /* ---------- Import mode ---------- */
 
 /* The "import mode" status chip — shown in the sidebar's badge row when an
@@ -934,24 +930,31 @@ body.undiscord-selecting * { cursor: crosshair !important; }
   font-family: var(--_u-font-display);
 }
 
-/* When an import is loaded, the General queue + Search/Delete filter sections
-   are not consulted at run time. Grey their fieldsets and disable interaction
-   so the user can see at a glance which inputs apply. The <summary> stays
-   clickable so sections can still be collapsed/expanded for inspection. */
+/* When an import is loaded, the General queue + Search filter sections are
+   not consulted at run time. Grey their fieldsets and disable interaction so
+   the user can see at a glance which inputs apply. The <summary> stays
+   clickable so sections can still be collapsed/expanded for inspection.
+   The Delete filter section stays interactive — its working toggles (text,
+   link, image/video/sound) apply during the import-mode pre-pass. Toggles
+   that need data the export doesn't carry (sticker, poll, embed, forward,
+   mentions) are individually marked .import-noop and grey out below. */
 #undiscord.import-mode #sectionGeneral > fieldset,
-#undiscord.import-mode #sectionGeneral > #queueCounter,
-#undiscord.import-mode #sectionSearchFilter > fieldset,
-#undiscord.import-mode #sectionDeleteFilter > fieldset {
+#undiscord.import-mode #sectionSearchFilter > fieldset {
+  opacity: 0.4;
+  pointer-events: none;
+  filter: grayscale(0.4);
+}
+#undiscord.import-mode .import-noop {
   opacity: 0.4;
   pointer-events: none;
   filter: grayscale(0.4);
 }
 
-/* The Import section's own summary line gets a subtle accent so the user can
-   spot it quickly when scrolling the sidebar. */
-#undiscord #sectionImport > summary {
-  color: var(--_u-text-link);
-}
+/* The Import section's summary uses the same gray as every other <summary>
+   when idle. When an import is loaded, .import-mode bumps the weight to 600
+   so the active state is visually distinct without leaning on a stand-out
+   accent color (an inherited blue from the theme-link variable used to live
+   here and clashed with the rest of the sidebar). */
 #undiscord.import-mode #sectionImport > summary {
   font-weight: 600;
 }

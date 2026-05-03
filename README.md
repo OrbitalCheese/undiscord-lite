@@ -4,16 +4,16 @@ Bulk-delete your messages in Discord servers, channels, and DMs. A zero-dependen
 
 ## Preface
 
-This project is an extensive rewrite of the Undiscord project by victornpb originally made for my own personal use, now graciously expanded to bless anyone ~~dumb~~ brave enough to download it. 
+This project is an extensive rewrite of the Undiscord project by victornpb originally made for my own personal use, now expanded for distribution to the general public. 
 
-The original lacked some serious core functionalities, polish, and was way too bloated and reliant on like a dozen node modules. This version is about 45x lighter and uses exactly ZERO. Everything is built in-house, and there is nothing to audit outside of what's in the repo. Nothing is obscured or imported, everything is auditable directly.  
+The original lacked some serious core functionalities, polish, and was way too bloated and reliant on like a dozen+ node modules. This version is about 45x lighter and uses exactly ZERO. Everything is built in-house, and there is nothing to audit outside of what's in the repo. Nothing is obscured or imported, everything is auditable directly.  
 
 ⚠️ DON'T TRUST RANDOM CODE FROM THE INTERNET WITHOUT UNDERSTANDING WHAT IT DOES AND HOW IT DOES IT! ⚠️
 
 This impotus was the main reason for my own rewrite. 12+ dependencies, was far too much obfuscation for my taste. I didn't trust undiscord so I ripped it to atoms and reconstructed a version that I built, verified, and can PERSONALLY 100% trust.
 
 You aren't me, so you should be ⚠️*very*⚠️ wary of claims made by me. 
-I lied to people before, and I will do it again. For I am but a man. Don't blindly trust anyone online. 
+I lied to people before, and I will do it again. For I am but a man.  
 
 That being said I tried my best to be as transparent as possible. 
 (Which could also be a lie to lull you into a false sense of security.)
@@ -44,7 +44,7 @@ That being said I tried my best to be as transparent as possible.
 
 Eg: 
 > 'I want to delete every @Alice message I ever made in the server, except the ones with my hilarious memes.'
-
+>
 >Set up @AliceUserID in mentions in the Search filter, this narrows down every single message in the server to say, 100 that contain an @Alice mention. Flick the images on in the Delete filter, and the script will go through those 100 posts, and skip deleting the ones with an image attachment. 
 
 ## Install
@@ -84,9 +84,9 @@ Mix and match across as many servers as you want — order doesn't matter, the q
 
 **DMs.** Open the DM in Discord and click `Add` on Channel. The Server field auto-fills as `@me`, the Channel field auto-fills with the DM ID — both pulled from Discord's URL.
 
-**Wiping every DM at once.** Click the **`Add DM's`** button in the DMs fieldset. It calls Discord's own `GET /users/@me/channels` endpoint with your existing auth token and queues every 1:1 DM currently open in your sidebar. Group DMs are skipped by default — toggle the **group DMs** pill (red/off → green/on) next to it to include them too.
+**Wiping every DM at once.** Click the **`Add DMs`** button in the DMs fieldset. It calls Discord's own `GET /users/@me/channels` endpoint with your existing auth token and queues every DM (1:1 and group) currently open in your sidebar. Tick **Exclude group DMs** to leave group DMs out of the bulk add.
 
-> Only currently-open DMs are queued. Conversations you've X'd out of the sidebar aren't returned by that endpoint — Discord considers them minimized rather than active. Re-open the DM in Discord first, then click `Add DM's` again. Or import message data for a comprehensive wipe.
+> Only currently-open DMs are queued. Conversations you've X'd out of the sidebar aren't returned by that endpoint — Discord considers them minimized rather than active. Re-open the DM in Discord first, then click `Add DMs` again. Or import message data for a comprehensive wipe.
 
 ### Running
 
@@ -98,7 +98,7 @@ The trash icon (whether mounted in the server bar or shown as the fallback FAB) 
 
 Collapsible sidebar sections:
 
-- **General** — Author ID, Server / Channel queue, DMs. NSFW channels are queried automatically; the script always sets `include_nsfw=true` server-side so age-gated channels return results.
+- **General** — Author ID, Server / Channel queue, DMs. The **Exclude NSFW channels** checkbox under Author ID inverts Discord's `include_nsfw` search flag (default off; check to exclude age-gated channels from search results).
 
 - **Search filter** — narrow what comes back from Discord's search: content text, attachment types (link / image / video / sound / sticker / poll / embed / forwarded), `@everyone / @here` pings, pinned mode, and a single `@user` mention.
 
@@ -129,17 +129,21 @@ If you've already requested your Discord data (User Settings → Privacy & Safet
 3. Open the panel's **Import data export** section. Click **Select Folder...** and point at that `messages/` folder.
 4. The summary line fills in: total messages, channel count, oldest/newest timestamp.
 5. Set your Date or Messages interval if you want to bound the wipe (e.g. "only delete posts older than 1 year"). These are pre-applied client-side before the run starts.
-6. Click **▶︎ Delete**. The General queue, Search filter, and Delete filter sections grey out — the import IS the queue.
+6. Click **▶︎ Delete**. The General queue and Search filter sections grey out — the import IS the queue. The Delete filter stays interactive, but individual toggles that need data the export doesn't carry (Sticker, Poll, Embed, Forward) grey out individually.
 
 **What still applies in import mode:**
 - Date interval and Messages interval (pre-pass; only matching records get queued).
+- Skip text (substring or exact-word match against message content).
+- Skip Link / Image / Video / Sound (URL-extension MIME inference against attachment list).
+- Skip extension (presets + custom semicolon-separated list) — extension is taken from the attachment URL.
+- Skip @user / Skip @everyone/@here — Discord's export keeps user mentions as `<@USERID>` (and `@everyone`/`@here` as literal text) inline in `Contents`, so a content regex recovers them.
 - Delete delay (paces the actual DELETE requests).
 - Streamer mode (redacts message content *and* usernames in the log + confirmation preview).
 
 **What doesn't apply:**
 - Author / Server / Channel / DM queue fields — replaced by the import.
 - Search filter (no API call to filter).
-- Delete filter — most categories rely on data the export doesn't carry (mentions, embeds, pin status). Date and message-interval bounds are the only filters honored.
+- Skip filters that need metadata the export doesn't carry: Sticker, Poll, Embed, Forward. If any of these are checked when an import is loaded, a warning lists them at run start so silent no-ops aren't surprising.
 - Search delay (no search call).
 
 **Edge cases:**
@@ -192,7 +196,7 @@ The longer version, in case you want to verify it yourself (you should):
   - `getToken()` — [`src/helpers.js:69`](src/helpers.js#L69)
   - iframe storage helper — [`src/helpers.js:58`](src/helpers.js#L58)
 
-- **Where the token goes.** Held in a JavaScript variable (`options.authToken`) for the duration of the run. Used only as the `Authorization` header on `fetch()` calls to `https://discord.com/api/v9/...`. The codebase has exactly four `fetch()` call sites — search, delete, the DM-list lookup behind the `Add DM's` button, and the pre-flight permission check for multi-author batching — all four pointing at `discord.com`.
+- **Where the token goes.** Held in a JavaScript variable (`options.authToken`) for the duration of the run. Used only as the `Authorization` header on `fetch()` calls to `https://discord.com/api/v9/...`. The codebase has exactly four `fetch()` call sites — search, delete, the DM-list lookup behind the `Add DMs` button, and the pre-flight permission check for multi-author batching — all four pointing at `discord.com`.
   - `authToken` field declaration — [`src/undiscord-core.js:52`](src/undiscord-core.js#L52)
   - search call — [`src/undiscord-core.js:419`](src/undiscord-core.js#L419) *(Authorization header at [line 447](src/undiscord-core.js#L447))*
   - delete call — [`src/undiscord-core.js:688`](src/undiscord-core.js#L688) *(Authorization header at [line 690](src/undiscord-core.js#L690))*
@@ -215,7 +219,7 @@ The longer version, in case you want to verify it yourself (you should):
   - log renderer — [`src/undiscord-ui.js:1253`](src/undiscord-ui.js#L1253) (`printLog`)
   - auto-trim limit — [`src/undiscord-ui.js:1248`](src/undiscord-ui.js#L1248) (`LOG_MAX_ENTRIES`)
 
-- **Auditable.** The bundled script is ~3,000 lines of readable JavaScript in one file ([`undiscord-lite.user.js`](undiscord-lite.user.js)). No minification, no obfuscation. Open it in any text editor before installing.
+- **Auditable.** The bundled script is ~3,600 lines of readable JavaScript in one file ([`undiscord-lite.user.js`](undiscord-lite.user.js)). No minification, no obfuscation. Open it in any text editor before installing.
 
 
 ## Build

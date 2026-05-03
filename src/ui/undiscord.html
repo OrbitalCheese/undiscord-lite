@@ -20,7 +20,8 @@
         <div class="sidebar scroll">
             <div id="sidebarActions">
                 <button id="start" class="danger" title="Start the deletion process">▶︎ Delete</button>
-                <button id="clear" title="Clear the log area">Clear Log</button>
+                <button id="verify" class="verify-mode" title="Print the current run configuration to the log so you can sanity-check it before clicking Delete.">📋 Verify</button>
+                <button id="clear" title="Clear the log area">🗑️ Clear Log</button>
             </div>
             <div id="sidebarBadgeRow">
                 <span id="importBadge" class="import-badge" style="display:none;" title="An imported export is loaded. The General queue, Search filter, and Delete filter sections are ignored — only Date and Messages interval still apply.">import mode</span>
@@ -40,9 +41,9 @@
                         <button id="selectAuthor" title="Click, then click a user or message in Discord to capture their User ID. Hold Shift to capture multiple in a row.">Select</button>
                     </div>
                     <div class="sectionDescription" style="margin-top: 6px;">
-                        <label class="row" style="margin-bottom: 0;" title="Toggle whether age-gated NSFW channels are queried by Discord's search API. Default: excluded.">
-                            <input id="includeNsfw" type="checkbox">
-                            <span id="includeNsfwLabel">Exclude NSFW channels</span>
+                        <label class="row" style="margin-bottom: 0;" title="When checked, age-gated NSFW channels are excluded from Discord's search results. Default: off (NSFW channels are included).">
+                            <input id="excludeNsfw" type="checkbox">
+                            Exclude NSFW channels
                         </label>
                     </div>
                 </fieldset>
@@ -74,17 +75,19 @@
                     </div>
                 </fieldset>
                 <fieldset>
-                    <legend>DMs</legend>
+                    <legend style="text-transform: none;">DMs</legend>
                     <button class="help-btn" data-help="dms" title="Show help for DMs">Help</button>
                     <div class="input-actions">
-                        <button id="addAllDms" title="Queue every DM channel currently open in your sidebar">Add DM's</button>
-                        <button id="delAllDms" title="Remove every queued DM channel from the queue">Clear DM's</button>
+                        <button id="addAllDms" title="Queue every DM channel currently open in your sidebar">Add DMs</button>
+                        <button id="delAllDms" title="Remove every queued DM channel from the queue">Clear DMs</button>
                     </div>
                     <div class="sectionDescription" style="margin-top: 3px;">
-                        <label class="row" style="margin-bottom: 0;" title="Toggle whether group DMs are included in the bulk add"><input id="includeGroupDms" type="checkbox"><span id="includeGroupDmsLabel">Skipping all group DM's</span></label>
+                        <label class="row" style="margin-bottom: 0;" title="When checked, group DMs are excluded from the bulk Add DMs action. Default: off (group DMs are included).">
+                            <input id="excludeGroupDms" type="checkbox">
+                            Exclude group DMs
+                        </label>
                     </div>
                 </fieldset>
-                <div id="queueCounter"></div>
             </details>
             <hr>
             <details id="sectionImport">
@@ -98,6 +101,39 @@
                         <button id="importClear" title="Clear the loaded import and return to live-search mode">Clear Import</button>
                     </div>
                     <div id="importSummary" class="sectionDescription" style="margin-top: 6px;">No import loaded.</div>
+                </fieldset>
+                <fieldset>
+                    <legend>Exclude Server</legend>
+                    <button class="help-btn" data-help="importExcludeServer" title="Show help for Exclude Server">Help</button>
+                    <div class="input-wrapper">
+                        <input class="clearable" id="importExcludeServers" type="text" placeholder="Server ID(s) to skip — comma-separated">
+                        <button class="clear-btn" id="clearImportExcludeServers" title="Clear excluded servers">Clear</button>
+                    </div>
+                    <div class="input-actions">
+                        <button id="selectImportExcludeServers" title="Click, then click a server icon in Discord to capture its ID. Hold Shift to capture several in a row.">Select</button>
+                    </div>
+                </fieldset>
+                <fieldset>
+                    <legend>Exclude Channel</legend>
+                    <button class="help-btn" data-help="importExcludeChannel" title="Show help for Exclude Channel">Help</button>
+                    <div class="input-wrapper">
+                        <input class="clearable" id="importExcludeChannels" type="text" placeholder="Channel ID(s) to skip — comma-separated">
+                        <button class="clear-btn" id="clearImportExcludeChannels" title="Clear excluded channels">Clear</button>
+                    </div>
+                    <div class="input-actions">
+                        <button id="selectImportExcludeChannels" title="Click, then click a channel or any message inside one to capture the channel ID. Hold Shift to capture several in a row.">Select</button>
+                    </div>
+                </fieldset>
+                <fieldset>
+                    <legend>Exclude DM with User</legend>
+                    <button class="help-btn" data-help="importExcludeUser" title="Show help for Exclude DM with User">Help</button>
+                    <div class="input-wrapper">
+                        <input class="clearable" id="importExcludeUsers" type="text" placeholder="User ID(s) — DMs/group DMs with these users will skip">
+                        <button class="clear-btn" id="clearImportExcludeUsers" title="Clear excluded users">Clear</button>
+                    </div>
+                    <div class="input-actions">
+                        <button id="selectImportExcludeUsers" title="Click, then click an avatar/username in Discord to capture the user ID. Hold Shift to capture several in a row.">Select</button>
+                    </div>
                 </fieldset>
             </details>
             <hr>
@@ -127,7 +163,7 @@
                     <div class="sectionDescription" style="margin-top: 8px;">
                         <label class="row" style="margin-bottom: 0;">Pinned:&nbsp;
                             <select id="pinnedMode">
-                                <option value="exclude" selected>exclude (skip)</option>
+                                <option value="exclude" selected>exclude</option>
                                 <option value="include">include</option>
                                 <option value="only">only pinned</option>
                             </select>
@@ -161,8 +197,10 @@
                     </div>
                     <div class="sectionDescription" style="margin-top: 6px;">
                         <label class="row" style="margin-bottom: 0;" title="Substring: term appears anywhere in the message. Exact: term must appear as a standalone word.">Match:&nbsp;
-                            <input id="excludeMatchPill" type="checkbox" checked>
-                            <span id="excludeMatchLabel">Substring</span>
+                            <select id="excludeMatchMode">
+                                <option value="substring" selected>substring</option>
+                                <option value="exact">exact</option>
+                            </select>
                         </label>
                     </div>
                 </fieldset>
@@ -174,10 +212,28 @@
                         <label><input id="excludeImage"   type="checkbox">Image</label>
                         <label><input id="excludeVideo"   type="checkbox">Video</label>
                         <label><input id="excludeSound"   type="checkbox">Sound</label>
-                        <label><input id="excludeSticker" type="checkbox">Sticker</label>
-                        <label><input id="excludePoll"    type="checkbox">Poll</label>
-                        <label><input id="excludeEmbed"   type="checkbox">Embed</label>
-                        <label><input id="excludeForward" type="checkbox">Forward</label>
+                        <label class="import-noop" title="Stickers aren't carried in the Discord data export — this toggle has no effect in import mode."><input id="excludeSticker" type="checkbox">Sticker</label>
+                        <label class="import-noop" title="Polls aren't carried in the Discord data export — this toggle has no effect in import mode."><input id="excludePoll"    type="checkbox">Poll</label>
+                        <label class="import-noop" title="Embeds aren't carried in the Discord data export — this toggle has no effect in import mode."><input id="excludeEmbed"   type="checkbox">Embed</label>
+                        <label class="import-noop" title="Forward metadata isn't carried in the Discord data export — this toggle has no effect in import mode."><input id="excludeForward" type="checkbox">Forward</label>
+                    </div>
+                </fieldset>
+                <fieldset>
+                    <legend>Skip extension</legend>
+                    <button class="help-btn" data-help="excludeExtension" title="Show help for Skip extension">Help</button>
+                    <div class="has-grid">
+                        <label><input type="checkbox" data-ext="jpg">.jpg</label>
+                        <label><input type="checkbox" data-ext="png">.png</label>
+                        <label><input type="checkbox" data-ext="mp4">.mp4</label>
+                        <label><input type="checkbox" data-ext="webm">.webm</label>
+                        <label><input type="checkbox" data-ext="pdf">.pdf</label>
+                        <label><input type="checkbox" data-ext="docx">.docx</label>
+                        <label><input type="checkbox" data-ext="txt">.txt</label>
+                        <label><input type="checkbox" data-ext="zip">.zip</label>
+                    </div>
+                    <div class="input-wrapper" style="margin-top: 8px;">
+                        <input class="clearable" id="excludeExtensions" type="text" placeholder="Custom: .ext1;.ext2;.ext3">
+                        <button class="clear-btn" id="clearExcludeExtensions" title="Clear custom extensions">Clear</button>
                     </div>
                 </fieldset>
                 <fieldset>
@@ -239,7 +295,7 @@
             </details>
             <hr>
             <details>
-                <summary>Advanced settings<button class="help-btn" data-help="tabAdvanced" title="Show help for the Advanced settings tab">Help</button></summary>
+                <summary>Delay settings<button class="help-btn" data-help="tabAdvanced" title="Show help for the Delay settings section">Help</button></summary>
                 <fieldset>
                     <legend>Search delay (ms)</legend>
                     <button class="help-btn" data-help="searchDelay" title="Show help for Search delay">Help</button>
@@ -273,6 +329,7 @@
             </div>
             <pre id="logArea" class="logarea scroll"></pre>
             <div class="tbar footer row">
+                <div id="footerTime"></div>
                 <span class="spacer"></span>
                 <label class="row footer-toggle" title="Redact message content AND usernames in the log + confirmation preview">
                     <input id="streamerMode" type="checkbox" checked> Streamer mode
