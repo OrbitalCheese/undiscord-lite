@@ -68,6 +68,14 @@ let pendingStartNotice = null;
 // onJob) display "Job 1/1" in the top bar instead of leftover values.
 let currentJobInfo = { i: 1, n: 1 };
 
+/** Streamer-mode redaction. Returns '••••' when the Streamer mode toggle is on, the value as-is otherwise. '@me' passes through verbatim — it's a literal Discord URL token, not a sensitive ID, and the queue-management logs read clearer with it intact. Empty / null inputs pass through so callers don't have to null-guard. */
+function dot(v) {
+  if (v == null || v === '') return v;
+  if (!$('input#streamerMode')?.checked) return v;
+  if (v === '@me') return '@me';
+  return '••••';
+}
+
 
 // ============================================================================
 // QUEUE PARSING & MUTATION
@@ -143,21 +151,21 @@ function addPair(server, channel) {
   if (channel === '') {
     // Server-wide. Absorb existing channel-specifics for this server.
     if (!wasNew && groups[idx].length === 0) {
-      return log.info(`${server} is already queued as server-wide.`);
+      return log.info(`${dot(server)} is already queued as server-wide.`);
     }
     if (!wasNew && groups[idx].length > 0) {
-      log.warn(`Server-wide wipe of ${server} absorbed ${groups[idx].length} channel-specific entr${groups[idx].length === 1 ? 'y' : 'ies'}.`);
+      log.warn(`Server-wide wipe of ${dot(server)} absorbed ${groups[idx].length} channel-specific entr${groups[idx].length === 1 ? 'y' : 'ies'}.`);
     }
     groups[idx] = [];
   } else {
     // Channel-specific. If the server is currently server-wide, NARROW it to
     // this channel. (Add Channel after Add Server means "actually, just this one".)
     if (!wasNew && groups[idx].length === 0) {
-      log.info(`Server-wide wipe of ${server} narrowed to ${server}:${channel}.`);
+      log.info(`Server-wide wipe of ${dot(server)} narrowed to ${dot(server)}:${dot(channel)}.`);
       groups[idx] = [channel];
     } else {
       if (groups[idx].includes(channel)) {
-        return log.info(`${server}:${channel} is already in the queue.`);
+        return log.info(`${dot(server)}:${dot(channel)} is already in the queue.`);
       }
       groups[idx].push(channel);
     }
@@ -216,12 +224,12 @@ function removeServer(server) {
   const { servers, groups } = readQueue($('input#guildId').value, $('input#channelId').value);
   const idx = servers.indexOf(server);
   if (idx === -1) {
-    log.info(`${server} is not in the batch — nothing to remove.`);
+    log.info(`${dot(server)} is not in the batch — nothing to remove.`);
     return;
   }
   servers.splice(idx, 1);
   groups.splice(idx, 1);
-  log.info(`Removed ${server} from the batch.`);
+  log.info(`Removed ${dot(server)} from the batch.`);
   writeQueue(servers, groups);
 }
 
@@ -242,16 +250,16 @@ function removeChannel(server, channel) {
   const { servers, groups } = readQueue($('input#guildId').value, $('input#channelId').value);
   const idx = servers.indexOf(server);
   if (idx === -1) {
-    log.info(`${server}:${channel} is not in the batch — nothing to remove.`);
+    log.info(`${dot(server)}:${dot(channel)} is not in the batch — nothing to remove.`);
     return;
   }
   if (groups[idx].length === 0) {
-    log.info(`${server} is queued as server-wide — use 'Delete' on the server to remove it.`);
+    log.info(`${dot(server)} is queued as server-wide — use 'Delete' on the server to remove it.`);
     return;
   }
   const cIdx = groups[idx].indexOf(channel);
   if (cIdx === -1) {
-    log.info(`${server}:${channel} is not in the batch — nothing to remove.`);
+    log.info(`${dot(server)}:${dot(channel)} is not in the batch — nothing to remove.`);
     return;
   }
   groups[idx].splice(cIdx, 1);
@@ -261,12 +269,12 @@ function removeChannel(server, channel) {
       // search endpoint and would error at run time.
       servers.splice(idx, 1);
       groups.splice(idx, 1);
-      log.info(`Removed ${server}:${channel} — last DM in the queue, dropping @me entirely (server-wide @me isn't a valid wipe target).`);
+      log.info(`Removed ${dot(server)}:${dot(channel)} — last DM in the queue, dropping @me entirely (server-wide @me isn't a valid wipe target).`);
     } else {
-      log.info(`Removed ${server}:${channel} — last channel, server converted to server-wide wipe.`);
+      log.info(`Removed ${dot(server)}:${dot(channel)} — last channel, server converted to server-wide wipe.`);
     }
   } else {
-    log.info(`Removed ${server}:${channel} from the batch.`);
+    log.info(`Removed ${dot(server)}:${dot(channel)} from the batch.`);
   }
   writeQueue(servers, groups);
 }
@@ -338,7 +346,6 @@ function renderTopBar() {
 /** Prints the active run configuration to the log without starting a run. Wired to the Verify button. */
 function verifyAction() {
   const sm = $('input#streamerMode').checked;
-  const dot = (v) => sm ? '••••' : v;
 
   log.info('── CONFIG VERIFY ──');
 
@@ -673,6 +680,27 @@ function initUI() {
   bindSelector('selectImportExcludeServers',  'importExcludeServers',  'server-multi',  'Import: Exclude Server');
   bindSelector('selectImportExcludeChannels', 'importExcludeChannels', 'channel-multi', 'Import: Exclude Channel');
   bindSelector('selectImportExcludeUsers',    'importExcludeUsers',    'user',          'Import: Exclude DM User');
+
+  // Import-mode exclusion Add / Delete buttons — append/remove the currently-
+  // viewed server / channel from the exclusion CSV. Mirror the General queue's
+  // addGuild / delGuild / addChannel / delChannel pattern. @me is allowed for
+  // Server here (unlike the General queue) — excluding it skips every DM.
+  $('button#addImportExcludeServers').onclick = () => {
+    const server = getGuildId();
+    if (server) addToCsvField($('input#importExcludeServers'), 'Import: Exclude Server', server);
+  };
+  $('button#delImportExcludeServers').onclick = () => {
+    const server = getGuildId();
+    if (server) removeFromCsvField($('input#importExcludeServers'), 'Import: Exclude Server', server);
+  };
+  $('button#addImportExcludeChannels').onclick = () => {
+    const channel = getChannelId();
+    if (channel) addToCsvField($('input#importExcludeChannels'), 'Import: Exclude Channel', channel);
+  };
+  $('button#delImportExcludeChannels').onclick = () => {
+    const channel = getChannelId();
+    if (channel) removeFromCsvField($('input#importExcludeChannels'), 'Import: Exclude Channel', channel);
+  };
 
   // Clear buttons inside each text input. Server clear cascades to Channel
   // (channels are scoped to a parent server). Channel clear leaves Server alone.
@@ -1447,22 +1475,22 @@ function insertCapturedId(input, label, id, type) {
     const kindLabel = type === 'user' ? 'user' : type === 'server-multi' ? 'server' : 'channel';
     const list = parseCsvList(input.value);
     if (list.includes(id)) {
-      log.info(`${id} is already in ${label} — skipped.`);
+      log.info(`${dot(id)} is already in ${label} — skipped.`);
       return;
     }
     list.push(id);
     input.value = list.join(',');
-    log.success(`Captured ${kindLabel} ID ${id} → ${label}.`);
+    log.success(`Captured ${kindLabel} ID ${dot(id)} → ${label}.`);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   } else if (type === 'user-single') {
     const previous = input.value.trim();
     if (previous === id) {
-      log.info(`${id} is already set in ${label} — no change.`);
+      log.info(`${dot(id)} is already set in ${label} — no change.`);
       return;
     }
     input.value = id;
-    if (previous) log.success(`Captured user ID ${id} → ${label} (overwrote ${previous}).`);
-    else          log.success(`Captured user ID ${id} → ${label}.`);
+    if (previous) log.success(`Captured user ID ${dot(id)} → ${label} (overwrote ${dot(previous)}).`);
+    else          log.success(`Captured user ID ${dot(id)} → ${label}.`);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   } else if (type === 'server') {
     // @me isn't a runnable server-wide target (the search endpoint requires a
@@ -1470,7 +1498,7 @@ function insertCapturedId(input, label, id, type) {
     if (id === '@me') {
       return log.warn('"Select" on Server captured @me, but server-wide @me isn\'t a valid wipe target — use "Add DMs" in the DMs section, or "Select" on Channel for a specific DM.');
     }
-    log.success(`Captured server ID ${id} → adding to queue (server-wide).`);
+    log.success(`Captured server ID ${dot(id)} → adding to queue (server-wide).`);
     addPair(id, '');
   } else if (type === 'channel') {
     // Resolve the parent server from the URL. Three URL shapes:
@@ -1484,19 +1512,46 @@ function insertCapturedId(input, label, id, type) {
     } else if (/\/channels\/@me\b/.test(location.href)) {
       parentServer = '@me';
     } else {
-      return log.warn(`Captured channel ID ${id} but couldn't determine its parent server from the URL — open the channel (or its parent server) in Discord first, then try again.`);
+      return log.warn(`Captured channel ID ${dot(id)} but couldn't determine its parent server from the URL — open the channel (or its parent server) in Discord first, then try again.`);
     }
     if (parentServer === '@me') {
-      log.success(`Captured DM channel ID ${id} → adding to queue.`);
+      log.success(`Captured DM channel ID ${dot(id)} → adding to queue.`);
     } else {
-      log.success(`Captured channel ID ${id} → adding to queue under server ${parentServer}.`);
+      log.success(`Captured channel ID ${dot(id)} → adding to queue under server ${dot(parentServer)}.`);
     }
     addPair(parentServer, id);
   } else {
     input.value = id;
-    log.success(`Captured message ID ${id} → ${label}.`);
+    log.success(`Captured message ID ${dot(id)} → ${label}.`);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }
+}
+
+/** Appends one ID to a comma-separated multi-input field with dedup. Used by the import-mode Exclude Server / Exclude Channel Add buttons; mirrors the General queue's addPair pattern but for a flat CSV list. Distinct from insertCapturedId (which logs "Captured ..." for Select-mode flow) so the Add button's log line reads naturally. */
+function addToCsvField(input, label, id) {
+  const list = parseCsvList(input.value);
+  if (list.includes(id)) {
+    log.info(`${dot(id)} is already in ${label} — skipped.`);
+    return;
+  }
+  list.push(id);
+  input.value = list.join(',');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  log.success(`Added ${dot(id)} to ${label}.`);
+}
+
+/** Removes one ID from a comma-separated multi-input field. No-op (with a log line) when the ID isn't present. Used by the import-mode Exclude Server / Exclude Channel Delete buttons; mirrors the General queue's removeChannel/removeServer pattern but for a flat CSV list. */
+function removeFromCsvField(input, label, id) {
+  const list = parseCsvList(input.value);
+  const idx = list.indexOf(id);
+  if (idx === -1) {
+    log.info(`${dot(id)} is not in ${label} — nothing to remove.`);
+    return;
+  }
+  list.splice(idx, 1);
+  input.value = list.join(',');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  log.success(`Removed ${dot(id)} from ${label}.`);
 }
 
 /** Wires a Select button to startSelection() with the matching input, type, and label. */
@@ -1559,13 +1614,13 @@ function bindSingleUserPaste(input, label) {
     e.preventDefault();
     const previous = input.value.trim();
     if (previous === text) {
-      log.info(`${label}: ${text} is already set — no change.`);
+      log.info(`${label}: ${dot(text)} is already set — no change.`);
       return;
     }
     input.value = text;
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    if (previous) log.info(`${label}: replaced ${previous} with ${text}.`);
-    else          log.info(`${label}: set to ${text}.`);
+    if (previous) log.info(`${label}: replaced ${dot(previous)} with ${dot(text)}.`);
+    else          log.info(`${label}: set to ${dot(text)}.`);
   });
 }
 
@@ -1736,7 +1791,7 @@ async function checkBatchPermissions(jobs, authToken) {
   }
 
   for (const f of failures) {
-    log.error(`You do not have permission on Server ID ${f.serverId} to delete messages from User ID(s): ${f.authors.join(', ')}.`);
+    log.error(`You do not have permission on Server ID ${dot(f.serverId)} to delete messages from User ID(s): ${f.authors.map(dot).join(', ')}.`);
   }
   log.error('Run aborted by pre-flight permission check.');
   return false;
@@ -1777,7 +1832,7 @@ function bindImportControls() {
     // Per-source breakdown — pulled from channel.json (guild + name) and
     // index.json (DM friend usernames; recipients in channel.json are IDs only).
     log.info('── IMPORT BREAKDOWN ──');
-    for (const line of summarizeImport(parsed)) log.info(`› ${line}`);
+    for (const line of summarizeImport(parsed, dot)) log.info(`› ${line}`);
     log.info('General queue, Search filter, and Delete filter are now bypassed. Date and Messages interval still apply.');
     // Reset so re-picking works.
     picker.value = '';
@@ -2115,8 +2170,7 @@ async function startAction() {
     const selfId = getAuthorId();
     if (selfId) {
       authorInput.value = selfId;
-      const shown = $('input#streamerMode').checked ? '••••' : selfId;
-      pendingStartNotice = `Author ID was empty — defaulting to your own user ID (${shown}).`;
+      pendingStartNotice = `Author ID was empty — defaulting to your own user ID (${dot(selfId)}).`;
     }
   }
 
@@ -2197,7 +2251,7 @@ async function startAction() {
     authorId,
     excludeNsfw,
     minId: minId || minDateUsed,
-    maxId: maxId || maxDateUsed,
+    maxId: maxId || maxDate,
     content,
     hasLink, hasImage, hasVideo, hasSound,
     hasSticker, hasPoll, hasEmbed, hasForward,

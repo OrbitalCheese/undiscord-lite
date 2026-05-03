@@ -155,13 +155,17 @@ function extractDmFriendName(indexValue) {
  * array of pre-formatted log lines. Sorted by message count (desc) within
  * each group so the heaviest sources surface first.
  *
+ * `redactName` is invoked on every server / DM / group display name before it
+ * lands in a line — caller wires it to the streamer-mode toggle so sensitive
+ * names get dotted out without summarizeImport itself depending on UI state.
+ *
  * Output shape:
  *   "Server: <name> | Channels: <N> | Messages: <total>"
  *   "DM:     <friend>                | Messages: <total>"
  *   "Group DM: <name or count>       | Messages: <total>"
  *   "Unknown channel kind: <N>       | Messages: <total>"   (channel.json missing)
  */
-export function summarizeImport(parsed) {
+export function summarizeImport(parsed, redactName = (v) => v) {
   const guilds = new Map();   // guildId -> { name, channels:Set<channelId>, count }
   const dms = new Map();      // channelId -> { friend, count }
   const groups = new Map();   // channelId -> { name, recipientCount, count }
@@ -192,18 +196,18 @@ export function summarizeImport(parsed) {
 
   const sortedGuilds = [...guilds.values()].sort((a, b) => b.count - a.count);
   for (const g of sortedGuilds) {
-    lines.push(`Server: ${g.name} | Channels: ${g.channels.size} | Messages: ${g.count.toLocaleString()}`);
+    lines.push(`Server: ${redactName(g.name)} | Channels: ${g.channels.size} | Messages: ${g.count.toLocaleString()}`);
   }
 
   const sortedDms = [...dms.values()].sort((a, b) => b.count - a.count);
   for (const d of sortedDms) {
-    lines.push(`DM: ${d.friend} | Messages: ${d.count.toLocaleString()}`);
+    lines.push(`DM: ${redactName(d.friend)} | Messages: ${d.count.toLocaleString()}`);
   }
 
   const sortedGroups = [...groups.values()].sort((a, b) => b.count - a.count);
   for (const g of sortedGroups) {
     const label = g.name || `Group DM (${g.recipientCount} people)`;
-    lines.push(`Group DM: ${label} | Messages: ${g.count.toLocaleString()}`);
+    lines.push(`Group DM: ${redactName(label)} | Messages: ${g.count.toLocaleString()}`);
   }
 
   if (unknown.size) {

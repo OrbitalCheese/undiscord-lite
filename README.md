@@ -91,6 +91,8 @@ Open/reload Discord afterwards. A trash icon mounts in Discord's left rail just 
 
 Open the panel with the trash icon or `Ctrl+Shift+D`. The panel is draggable by its header and resizable from any edge or corner.
 
+![alt text](readmeImages/{449D24F2-1C45-4B1E-9F3E-AF2927BB247D}.png)
+
 ### Author ID
 
 The Author ID field determines whose messages get deleted. Click **`Me`** to auto-fill your own user ID. Leave it empty and it defaults to your own at run time. You can paste a different user's ID, but Discord will only let you delete messages on channels where you have **Manage Messages** permission for that user (e.g. moderating your own server).
@@ -104,6 +106,8 @@ Server ID and Channel ID each have three control buttons plus a `Clear` button i
 - **`Add`** — queues the current target. While viewing a server, `Add` on Server queues a server-wide wipe; while viewing a channel, `Add` on Channel queues that one channel (and pulls in its parent server).
 - **`Select`** — enters point-and-click capture mode. The next click on a server icon / channel / message in Discord drops its ID into the field. Hold Shift to keep capturing without exiting.
 - **`Delete`** — removes the current target from the queue. Removing the last channel under a server widens it back to a server-wide wipe.
+
+![alt text]({F247CB82-8F22-4286-917F-368798B40212}.png)
 
 Mix and match across as many servers as you want — order doesn't matter, the queue display groups everything by server.
 
@@ -121,7 +125,9 @@ Hit **`▶︎ Delete`**. On the first job, a confirmation dialog shows you the e
 
 The trash icon (whether mounted in the server bar or shown as the fallback FAB) turns red while a run is active and shows a thin progress bar. Click **`🛑 Stop`** at any time — the in-flight delay aborts immediately, no need to sit through the current sleep.
 
-### Verify (the dry-run button)
+![alt text](readmeImages/{F13378F4-AB38-48D5-88D2-BF5E36C162BE}.png)
+
+### Verify
 
 **`📋 Verify`** prints a structured snapshot of the current run config to the log without starting anything. Mode (live / import), queue contents grouped by server, every active filter on both sides, both intervals, and the current delay values. Useful when you've toggled a lot of switches and want to sanity-check what `▶︎ Delete` will actually do before you click it.
 
@@ -158,6 +164,8 @@ Collapsible sidebar sections:
 ## Import mode
 
 If you've already requested your Discord data (User Settings → Privacy & Safety → **Request All My Data**), the resulting ZIP contains a complete index of every message you've ever sent. Import mode reads that index directly and skips Discord's search API entirely — turning a multi-hour wipe into a lightning fast delete-only run.
+
+![alt text](readmeImages/{DB74C906-69C2-40EA-980D-CC0466B418F3}.png)
 
 **How to use it:**
 
