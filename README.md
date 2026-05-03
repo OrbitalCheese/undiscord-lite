@@ -107,7 +107,7 @@ Server ID and Channel ID each have three control buttons plus a `Clear` button i
 - **`Select`** — enters point-and-click capture mode. The next click on a server icon / channel / message in Discord drops its ID into the field. Hold Shift to keep capturing without exiting.
 - **`Delete`** — removes the current target from the queue. Removing the last channel under a server widens it back to a server-wide wipe.
 
-![alt text]({F247CB82-8F22-4286-917F-368798B40212}.png)
+![alt text](readmeImages/{F247CB82-8F22-4286-917F-368798B40212}.png)
 
 Mix and match across as many servers as you want — order doesn't matter, the queue display groups everything by server.
 
