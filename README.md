@@ -173,7 +173,7 @@ Collapsible sidebar sections:
   - **Skip extension** — eight preset pills for the most-shared file types (`.jpg .png .mp4 .webm .pdf .docx .txt .zip`) plus a custom semicolon-separated textbox for anything else (`.psd;.dmg;.iso`). Whitespace trimmed, case normalized, leading dots optional. Any single attachment match drops the whole message.
   - **Skip Image / Skip Video** category toggles auto-tick the matching extension presets (`.jpg`+`.png` / `.mp4`+`.webm`); unticking any preset clears the parent toggle.
 
-![alt text]({74A43ADC-CD56-4D74-B308-22DACD8A5940}.png)
+![alt text]({readmeImages/74A43ADC-CD56-4D74-B308-22DACD8A5940}.png)
 
 > **@Mentions asymmetry.** The Search filter's <kbd>Include @user</kbd> field accepts **one** ID — Discord's `mentions=` query param only filters by a single mentioned user per request. The Delete filter's <kbd>Skip @user</kbd> field accepts **any number** of comma-separated IDs, because the skip is a client-side check after the response: every listed ID is matched against each message's mentions. So if you queue a 10k-message run and want to skip three @users, list all three on the Skip side and they'll all be honored in one pass.
 
@@ -189,7 +189,7 @@ Collapsible sidebar sections:
 
 - **Import data export** — pre-load message IDs from your Discord data export and skip the search phase entirely (~3-5x faster on large wipes; no search-index-lag failure modes). See [Import mode](#import-mode) below.
 
-![alt text]({41CA0C22-16F4-4AFC-9E8F-9AC0446BAEDB}.png)
+![alt text]({readmeImages/41CA0C22-16F4-4AFC-9E8F-9AC0446BAEDB}.png)
 
 > Discord's UI requires dev mode to be on to copy raw message IDs — only a message *link* can be copied otherwise. The textbox auto-strips the link down to the message ID, so you *can* just paste it in there with no problems.
 >
