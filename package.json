@@ -1,7 +1,7 @@
 {
   "name": "undiscord-lite",
   "nameFull": "Undiscord Lite",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Bulk-delete Discord messages. Zero-dependency personal fork of Undiscord with multi-server batching.",
   "author": "OrbitalCheese",
   "license": "MIT",
