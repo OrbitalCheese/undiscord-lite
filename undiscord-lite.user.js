@@ -27,11 +27,11 @@ function __require(id) {
 }
 
 __modules["src/ui/styles.css"] = (__exports) => {
-  __exports.default = "/* ============================================================================\n * PALETTE\n * ----------------------------------------------------------------------------\n * Self-contained dark palette pinned to hardcoded hex values — does not read\n * from Discord's --background-* / --text-* CSS variables, so custom themes\n * (BetterDiscord, Vencord, etc.) cannot recolour the panel. Centralised here\n * so the whole scheme can be retuned in one place without touching individual\n * rules.\n * ============================================================================ */\n#undiscord { --_u-bg-panel:        #2b2d31; --_u-bg-header:       #1e1f22; --_u-bg-sidebar:      #17181b; /* deliberately darker than --_u-bg-input so text fields visually sit on top of the sidebar instead of blending into it */   --_u-bg-main:         #313338; --_u-bg-toolbar:      #2b2d31; --_u-bg-input:        #1e1f22; --_u-bg-floating:     #111214; --_u-bg-hover:        #35373c; --_u-bg-accent:       #3f4147; --_u-bg-surface-high: #2b2d31; --_u-text:        #dbdee1; --_u-text-muted:  #949ba4; --_u-text-header: #f2f3f5; --_u-text-label:  #b5bac1; --_u-text-link:   #00a8fc; --_u-int:        #b5bac1; --_u-int-hover:  #dbdee1; --_u-int-active: #ffffff; --_u-int-muted:  #6d6f78; --_u-btn-secondary: #4e5058; --_u-btn-danger:    #da373c; --_u-border:       rgba(78, 80, 88, 0.48); --_u-input-border: #1e1f22; --_u-scrollbar-thumb: rgba(24, 25, 28, 0.6); --_u-scrollbar-track: transparent; --_u-shadow:        0 8px 16px rgba(0, 0, 0, 0.24); --_u-shadow-stroke: 0 0 0 1px rgba(0, 0, 0, 0.2); --_u-font-display:  'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif; }\n/* undiscord window */\n#undiscord.browser { box-shadow: var(--_u-shadow-stroke), var(--_u-shadow); border: 1px solid var(--_u-border); overflow: hidden; }\n#undiscord.container,\n#undiscord .container { background-color: var(--_u-bg-surface-high); border-radius: 8px; box-sizing: border-box; cursor: default; flex-direction: column; }\n#undiscord .header { background-color: var(--_u-bg-header); height: 48px; align-items: center; min-height: 48px; padding: 0 16px; display: flex; color: var(--_u-text-label); }\n#undiscord .header .icon { color: var(--_u-int); margin-right: 8px; flex-shrink: 0; width: 24; height: 24; }\n#undiscord .header .icon:hover { color: var(--_u-int-hover); }\n#undiscord .header h3 { font-size: 16px; line-height: 20px; font-weight: 500; font-family: var(--_u-font-display); color: var(--_u-text-header); flex-shrink: 0; margin-right: 16px; }\n#undiscord .spacer { flex-grow: 1; }\n#undiscord .header .vert-divider { width: 1px; height: 24px; background-color: var(--_u-bg-accent); margin-right: 16px; flex-shrink: 0; }\n#undiscord legend,\n#undiscord label { color: var(--_u-text-label); font-size: 12px; line-height: 16px; font-weight: 500; text-transform: uppercase; cursor: default; font-family: var(--_u-font-display); margin-bottom: 8px; }\n#undiscord .multiInput { display: flex; align-items: center; font-size: 16px; box-sizing: border-box; width: 100%; border-radius: 3px; color: var(--_u-text); background-color: var(--_u-bg-input); border: none; transition: border-color 0.2s ease-in-out 0s; }\n#undiscord .multiInput :first-child { flex-grow: 1; }\n#undiscord .multiInput button:last-child { margin-right: 4px; }\n#undiscord .multiInput button + button { margin-left: 3px; }\n#undiscord .input-actions { display: flex; gap: 4px; margin-top: 6px; }\n#undiscord .input-actions button { flex: 1; /* Tighter horizontal padding than the base 16px so longer labels (Select, Delete) fit. */     padding: 2px 6px; }\n/* Action button accents — set: tinge-darker gray, add: muted forest green, del: bordeaux. */\n#undiscord .input-actions button[id^=\"set\"]    { background-color: #3f4147; }\n#undiscord .input-actions button[id^=\"add\"]    { background-color: #3a7d4d; }\n#undiscord .input-actions button[id^=\"del\"]    { background-color: #722f37; }\n/* Select buttons: blue when idle, amber while waiting for a click, light purple\n   while waiting AND Shift is held (shift-lock — multi-capture mode). */\n#undiscord .input-actions button[id^=\"select\"]                       { background-color: #2c5d8e; }\n#undiscord .input-actions button[id^=\"select\"].active                { background-color: #b8860b; }\n#undiscord .input-actions button[id^=\"select\"].active.shift-locked   { background-color: #a78bfa; }\n/* Global crosshair cursor while any Select button is armed. */\nbody.undiscord-selecting,\nbody.undiscord-selecting * { cursor: crosshair !important; }\n/* Inline Clear buttons — sit absolutely on the right edge of any text-input\n   wrapper. The .clearable class on the input adds matching right padding so\n   typed text doesn't slide under the button. */\n#undiscord .input-wrapper { position: relative; }\n#undiscord input.clearable { padding-right: 60px; }\n#undiscord button.clear-btn { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: auto; min-width: 0; height: 28px; min-height: 28px; padding: 0 10px; font-size: 11px; font-weight: 500; background-color: #4e5058; color: var(--_u-text); border-radius: 4px; cursor: pointer; z-index: 1; }\n/* Date-preset shortcuts — green/amber/red traffic-light scaling with scope. */\n#undiscord .date-preset-day  { background-color: #3a7d4d; }\n#undiscord .date-preset-week { background-color: #b8860b; }\n#undiscord .date-preset-all  { background-color: #722f37; }\n/* Stepper rows for the delay controls. Compact buttons next to a read-only display. */\n#undiscord .stepper { display: flex; align-items: center; gap: 4px; margin-top: 6px; }\n/* Input is fixed at 100px and text-left-aligned so short values don't drift.\n   Stepper buttons (flex: 1) grow to fill the remaining horizontal space\n   equally. The input is editable — typed values auto-clamp on commit. */\n#undiscord .stepper input[type=\"text\"] { flex: 0 0 100px; text-align: left; cursor: text; }\n#undiscord .stepper button { flex: 1; width: auto; min-width: 32px; padding: 0; font-weight: 700; }\n#undiscord .stepper-down { background-color: #722f37; }\n#undiscord .stepper-up { background-color: #3a7d4d; }\n#undiscord .stepper-reset { background-color: #2c5d8e; }\n/* Compact help button — pinned to the top-right of its fieldset (sibling of the\n   legend, since <legend> rendering doesn't reliably honor display:flex). The\n   right edge sits flush with the input/control edges below it. */\n#undiscord fieldset { position: relative; }\n#undiscord button.help-btn { position: absolute; top: -23px; right: 0; width: auto; min-width: 0; height: 16px; min-height: 16px; padding: 0 6px; font-size: 10px; font-weight: 500; text-transform: uppercase; border: none; border-radius: 3px; background-color: #2c5d8e; color: #ffffff; cursor: pointer; }\n/* Tab-level help button: vertically centered inside the <summary>, right-aligned. */\n#undiscord summary button.help-btn { top: 50%; right: 8px; transform: translateY(-50%); }\n/* Has-type checkbox grid — 2 per row inside the Include filter. */\n#undiscord .has-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-bottom: 12px; }\n#undiscord .has-grid label { display: flex; align-items: center; margin-bottom: 0; text-transform: none; cursor: pointer; }\n#undiscord .has-grid input[type=\"checkbox\"] { margin-right: 6px; }\n/* Select dropdown styling — match the dark panel. */\n#undiscord select { background-color: var(--_u-bg-input); color: var(--_u-text); border: 1px solid var(--_u-input-border); border-radius: 4px; padding: 4px 6px; font-family: var(--_u-font-display); font-size: 14px; cursor: pointer; }\n/* Pill-style on/off toggle. Replaces every native checkbox visual inside the\n   panel: red when off, green when on. The .has-grid override below tightens\n   margin in the dense 2-column grids. */\n#undiscord input[type=\"checkbox\"] { appearance: none; -webkit-appearance: none; position: relative; width: 36px; height: 18px; margin: 0 8px 0 0; padding: 0; border: none; border-radius: 9px; background-color: #722f37; cursor: pointer; transition: background-color 0.2s ease; vertical-align: middle; flex-shrink: 0; }\n#undiscord input[type=\"checkbox\"]::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background-color: #ffffff; transition: transform 0.2s ease; }\n#undiscord input[type=\"checkbox\"]:checked { background-color: #3a7d4d; }\n#undiscord input[type=\"checkbox\"]:checked::after { transform: translateX(18px); }\n#undiscord .input { font-size: 16px; width: 100%; transition: border-color 0.2s ease-in-out 0s; padding: 10px; height: 44px; background-color: var(--_u-bg-input); border: 1px solid var(--_u-input-border); border-radius: 8px; box-sizing: border-box; color: var(--_u-text); }\n#undiscord fieldset { margin-top: 16px; }\n#undiscord .input-wrapper { display: flex; align-items: center; font-size: 16px; box-sizing: border-box; width: 100%; border-radius: 3px; color: var(--_u-text); background-color: var(--_u-bg-input); border: none; transition: border-color 0.2s ease-in-out 0s; }\n#undiscord input[type=\"text\"],\n#undiscord input[type=\"search\"],\n#undiscord input[type=\"password\"],\n#undiscord input[type=\"datetime-local\"],\n#undiscord input[type=\"number\"],\n#undiscord input[type=\"range\"] { background-color: var(--_u-bg-input); border: 1px solid var(--_u-input-border); border-radius: 8px; box-sizing: border-box; color: var(--_u-text); font-size: 16px; height: 44px; padding: 12px 10px; transition: border-color .2s ease-in-out; width: 100%; }\n#undiscord input[type=\"file\"] { color: var(--_u-text); }\n#undiscord hr { border: none; margin-bottom: 24px; padding-bottom: 4px; border-bottom: 1px solid var(--_u-bg-accent); }\n#undiscord .sectionDescription { margin-bottom: 16px; color: var(--_u-text-label); font-size: 14px; line-height: 20px; font-weight: 400; }\n#undiscord a { color: var(--_u-text-link); text-decoration: none; }\n#undiscord a:hover { text-decoration: underline; }\n#undiscord .btn,\n#undiscord button { position: relative; display: flex; -webkit-box-pack: center; justify-content: center; -webkit-box-align: center; align-items: center; box-sizing: border-box; background: none; border: none; border-radius: 3px; font-size: 14px; font-weight: 500; line-height: 16px; padding: 2px 16px; user-select: none; cursor: pointer; /* sizeSmall */     width: 60px; height: 32px; min-width: 60px; min-height: 32px; /* lookFilled colorPrimary */     color: #ffffff; background-color: var(--_u-btn-secondary); transition: background-color 0.15s ease, filter 0.15s ease; }\n#undiscord .btn:hover,\n#undiscord button:hover { filter: brightness(1.15); }\n#undiscord button:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }\n#undiscord .sizeMedium { width: 96px; height: 38px; min-width: 96px; min-height: 38px; }\n#undiscord .sizeMedium.icon { width: 38px; min-width: 38px; }\n#undiscord sup { vertical-align: top; }\n#undiscord .danger { background-color: var(--_u-btn-danger); }\n/* Verify-button accent — a darker navy than the existing #2c5d8e Select-button\n   blue so it reads as a distinct, secondary action and doesn't get mistaken\n   for a Select-mode trigger. */\n#undiscord .verify-mode { background-color: #1e4470; }\n/* Scrollbar */\n#undiscord .scroll::-webkit-scrollbar { width: 8px; height: 8px; }\n#undiscord .scroll::-webkit-scrollbar-corner { background-color: transparent; }\n#undiscord .scroll::-webkit-scrollbar-thumb { background-clip: padding-box; border: 2px solid transparent; border-radius: 4px; background-color: var(--_u-scrollbar-thumb); min-height: 40px; }\n#undiscord .scroll::-webkit-scrollbar-track { border-color: var(--_u-scrollbar-track); background-color: var(--_u-scrollbar-track); border: 2px solid var(--_u-scrollbar-track); }\n/* fade scrollbar */\n#undiscord .scroll::-webkit-scrollbar-thumb,\n#undiscord .scroll::-webkit-scrollbar-track { visibility: hidden; }\n#undiscord .scroll:hover::-webkit-scrollbar-thumb,\n#undiscord .scroll:hover::-webkit-scrollbar-track { visibility: visible; }\n#undiscord :disabled { display: none; }\n/**** layout and utility classes ****/\n#undiscord,\n#undiscord * { box-sizing: border-box; }\n#undiscord .col { display: flex; flex-direction: column; }\n#undiscord .row { display: flex; flex-direction: row; align-items: center; }\n#undiscord .mb1 { margin-bottom: 8px; }\n#undiscord .log { margin-bottom: 0.25em; }\n#undiscord .log-debug { color: var(--_u-text); }\n#undiscord .log-info { color: #00b0f4; }\n#undiscord .log-verb { color: var(--_u-text-muted); }\n#undiscord .log-warn { color: #faa61a; }\n#undiscord .log-error { color: #f04747; }\n#undiscord .log-success { color: #43b581; }\n/**** Undiscord Button (FAB) ****/\n#undiscord-btn { position: fixed; bottom: 20px; right: 20px; z-index: 99; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: #18191c; color: #b5bac1; border-radius: 50%; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3); cursor: pointer; transition: color 0.15s ease, transform 0.15s ease, background 0.15s ease; }\n#undiscord-btn:hover { color: #ffffff; background: #2e3035; transform: scale(1.05); }\n#undiscord-btn:focus-visible { outline: 2px solid #5865f2; outline-offset: 2px; }\n#undiscord-btn progress { position: absolute; bottom: 4px; left: 8px; width: 32px; height: 4px; display: none; }\n#undiscord-btn.running { color: #da373c !important; }\n#undiscord-btn.running progress { display: block; }\n/**** Undiscord Interface ****/\n#undiscord { position: fixed; z-index: 100; top: 58px; right: 10px; display: flex; flex-direction: column; width: 800px; height: 80vh; min-width: 610px; max-width: 100vw; min-height: 448px; max-height: 100vh; color: var(--_u-text); border-radius: 4px; background-color: var(--_u-bg-panel); box-shadow: var(--_u-shadow-stroke), var(--_u-shadow); will-change: top, left, width, height; }\n#undiscord .header .icon { cursor: pointer; }\n#undiscord .window-body { height: calc(100% - 48px); }\n#undiscord .sidebar { /* Always reserve scrollbar space — overflow-y: scroll keeps the gutter\n       even when content fits, so right-aligned elements don't shift when the\n       sidebar starts overflowing. Fade-on-hover .scroll rules still hide the\n       bar visually until mouseover. */\n    overflow-x: hidden; overflow-y: scroll; /* flex-shrink: 0 locks the sidebar at its target width regardless of what\n       .main wants — without it, log content growing inside .main pulls space\n       from the sidebar via the flex layout, shifting everything in here. */\n    width: 270px; flex-shrink: 0; height: 100%; max-height: 100%; padding: 8px; background: var(--_u-bg-sidebar); }\n#undiscord .sidebar legend,\n#undiscord .sidebar label { display: block; width: 100%; }\n#undiscord .main { display: flex; max-width: calc(100% - 250px); background-color: var(--_u-bg-main); flex-grow: 1; }\n#undiscord #logArea { font-family: Consolas, Liberation Mono, Menlo, Courier, monospace; font-size: 0.75rem; overflow: auto; padding: 10px; user-select: text; flex-grow: 1; cursor: auto; /* Wrap long lines at the panel's right edge instead of overflowing horizontally.\n       pre-wrap preserves intentional whitespace; overflow-wrap breaks unbroken\n       strings (URLs, snowflakes) when no whitespace is available to wrap on. */\n    white-space: pre-wrap; overflow-wrap: break-word; }\n#undiscord .tbar { padding: 8px; background-color: var(--_u-bg-toolbar); }\n#undiscord .tbar button { margin-right: 4px; margin-bottom: 4px; }\n/* Top-bar status line. Idle state: a queue/import summary or empty-queue hint.\n   Running state: live progress text (percent / value / elapsed / remaining).\n   Lives inside #topBarSlot which is the first row of the top toolbar above the\n   log area; the second row holds the visual <progress> element. */\n#undiscord #topBarSlot { flex-grow: 1; min-height: 20px; }\n#undiscord .status-line { padding: 2px 6px; font-size: 13px; color: var(--_u-text-muted); line-height: 20px; }\n#undiscord .status-line.status-empty { font-style: italic; }\n#undiscord .status-line.status-running { color: var(--_u-text); font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace; font-size: 12px; letter-spacing: 0.2px; }\n/**** Elements ****/\n#undiscord summary { font-size: 16px; font-weight: 500; line-height: 20px; position: relative; overflow: hidden; margin-bottom: 2px; padding: 6px 10px; cursor: pointer; white-space: nowrap; text-overflow: ellipsis; color: var(--_u-int); border-radius: 4px; flex-shrink: 0; }\n#undiscord summary:hover { color: var(--_u-int-hover); background-color: var(--_u-bg-hover); }\n#undiscord fieldset { padding-left: 8px; }\n#undiscord legend a { float: right; text-transform: initial; }\n#undiscord progress { height: 8px; margin-top: 4px; flex-grow: 1; }\n#undiscord .importJson { display: flex; flex-direction: row; }\n#undiscord .importJson button { margin-left: 5px; width: fit-content; }\n/**** Drag/resize handles ****/\n[name^=\"grab-\"] { position: absolute; --size: 6px; --corner-size: 16px; --offset: -1px; z-index: 9; }\n[name^=\"grab-\"]:hover { background: rgba(128, 128, 128, 0.1); }\n[name=\"grab-t\"] { top: 0; left: var(--corner-size); right: var(--corner-size); height: var(--size); margin-top: var(--offset); cursor: ns-resize; }\n[name=\"grab-r\"] { top: var(--corner-size); bottom: var(--corner-size); right: 0; width: var(--size); margin-right: var(--offset); cursor: ew-resize; }\n[name=\"grab-b\"] { bottom: 0; left: var(--corner-size); right: var(--corner-size); height: var(--size); margin-bottom: var(--offset); cursor: ns-resize; }\n[name=\"grab-l\"] { top: var(--corner-size); bottom: var(--corner-size); left: 0; width: var(--size); margin-left: var(--offset); cursor: ew-resize; }\n[name=\"grab-tl\"] { top: 0; left: 0; width: var(--corner-size); height: var(--corner-size); margin-top: var(--offset); margin-left: var(--offset); cursor: nwse-resize; }\n[name=\"grab-tr\"] { top: 0; right: 0; width: var(--corner-size); height: var(--corner-size); margin-top: var(--offset); margin-right: var(--offset); cursor: nesw-resize; }\n[name=\"grab-br\"] { bottom: 0; right: 0; width: var(--corner-size); height: var(--corner-size); margin-bottom: var(--offset); margin-right: var(--offset); cursor: nwse-resize; }\n[name=\"grab-bl\"] { bottom: 0; left: 0; width: var(--corner-size); height: var(--corner-size); margin-bottom: var(--offset); margin-left: var(--offset); cursor: nesw-resize; }\n/**** Decorative resize indicator + cursor hints ****/\n#undiscord .header { cursor: grab; }\n#undiscord .footer { cursor: se-resize; padding-right: 30px; }\n.resize-handle { position: absolute; bottom: -15px; right: -15px; width: 30px; height: 30px; transform: rotate(-45deg); background: repeating-linear-gradient(0, var(--_u-bg-accent), var(--_u-bg-accent) 1px, transparent 2px, transparent 4px); cursor: nwse-resize; }\n/* ============================================================================\n * SERVER-BAR TRASH ICON\n * ----------------------------------------------------------------------------\n * Injected into Discord's left rail between the DM/Home separator and the\n * first server. Mimics Discord's server-icon shape-morph: circle at rest,\n * rounded square on hover/active. Lives outside #undiscord, so selectors\n * are global.\n * ============================================================================ */\n#undiscord-server-btn { display: flex; align-items: center; justify-content: center; width: 100%; height: 48px; cursor: pointer; position: relative; user-select: none; }\n#undiscord-server-btn .udl-blob { width: 40px; height: 40px; border-radius: 50%; background-color: #1e1f22; color: #b5bac1; display: flex; align-items: center; justify-content: center; position: relative; transition: border-radius 0.15s ease, background-color 0.15s ease, color 0.15s ease; }\n#undiscord-server-btn:hover .udl-blob { border-radius: 16px; background-color: #da373c; color: #ffffff; }\n#undiscord-server-btn.running .udl-blob { border-radius: 16px; background-color: #da373c; color: #ffffff; }\n#undiscord-server-btn .udl-progress { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 28px; height: 4px; display: none; }\n#undiscord-server-btn.running .udl-progress { display: block; }\n/* Stoplight-amber progress on white track — grows as deletes complete, contrasts\n   cleanly against the red running-state blob. */\n#undiscord-server-btn .udl-progress::-webkit-progress-bar { background-color: #ffffff; border-radius: 2px; }\n#undiscord-server-btn .udl-progress::-webkit-progress-value { background-color: #b8860b; border-radius: 2px; transition: width 0.2s ease; }\n#undiscord-server-btn .udl-progress::-moz-progress-bar { background-color: #b8860b; border-radius: 2px; }\n/* ============================================================================\n * STREAMER MODE\n * ----------------------------------------------------------------------------\n * When the Streamer mode toggle is on (panel root carries .streamer-on),\n * every input field that holds a Discord ID renders its value as dots so\n * screen recordings, streams, and shoulder-surfing don't leak user / server\n * / channel / message IDs. Placeholders stay readable. The text-content\n * filter inputs, date pickers, and delay steppers stay readable too — those\n * don't carry sensitive IDs.\n *\n * `text-security` is the unprefixed proposed standard; `-webkit-text-security`\n * is what Chromium / Discord's Electron client honours today.\n * ============================================================================ */\n#undiscord.streamer-on input#authorId,\n#undiscord.streamer-on input#guildId,\n#undiscord.streamer-on input#channelId,\n#undiscord.streamer-on input#mentionsId,\n#undiscord.streamer-on input#excludeMentionsId,\n#undiscord.streamer-on input#minId,\n#undiscord.streamer-on input#maxId,\n#undiscord.streamer-on input#importExcludeServers,\n#undiscord.streamer-on input#importExcludeChannels,\n#undiscord.streamer-on input#importExcludeUsers { -webkit-text-security: disc; text-security: disc; }\n/* ============================================================================\n * SIDEBAR ACTION GROUP\n * ----------------------------------------------------------------------------\n * Pinned at the top of the sidebar above all <details> sections. Two stacked\n * full-width buttons: the primary action (#start) on row 1, Clear Log on\n * row 2. The primary's text / class / handler toggles between \"▶︎ Delete\"\n * (idle, red) and \"🛑 Stop\" (running, red) — same physical button, two\n * roles, no layout reflow when a run starts.\n * ============================================================================ */\n#undiscord #sidebarActions { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }\n#undiscord #sidebarActions > button { width: 100%; min-width: 0; height: 38px; min-height: 38px; padding: 2px 6px; }\n/* Center the import-mode badge (when shown) directly below the action buttons.\n   When the badge is hidden the row still occupies a few px of vertical space\n   above the <hr> — visually negligible (~4px), and avoids the fragility of\n   selecting on inline display:none across HTML/JS serialization quirks. */\n#undiscord #sidebarBadgeRow { text-align: center; margin-bottom: 4px; }\n/* ============================================================================\n * FOOTER TOGGLES\n * ----------------------------------------------------------------------------\n * Streamer mode + Auto scroll inline labels in the footer row, plus the live\n * elapsed/remaining readout pinned to the footer's left edge during a run.\n * ============================================================================ */\n/* Tighter spacing and no uppercase styling (overrides the global label rule). */\n#undiscord .footer .footer-toggle { margin-bottom: 0; margin-right: 12px; text-transform: none; font-size: 13px; font-weight: 400; cursor: pointer; }\n/* Live elapsed/remaining readout — populated by onProgress, cleared by onStop.\n   Tied to the LEFT edge of the footer (the spacer pushes the toggles right).\n   Empty when idle, monospace+muted when active so the digits don't shift. */\n#undiscord .footer #footerTime { font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace; font-size: 12px; color: var(--_u-text-muted); letter-spacing: 0.2px; padding-left: 4px; }\n/* ============================================================================\n * IMPORT MODE\n * ----------------------------------------------------------------------------\n * Status chip + section greying when an export is loaded. The General queue\n * and Search filter sections grey out (the import IS the queue); individual\n * Skip-filter toggles whose data isn't carried by the export grey out\n * separately via the .import-noop class.\n * ============================================================================ */\n/* The \"import mode\" status chip — shown in the sidebar's badge row when an\n   export is loaded. Discord-blurple, reads as a status indicator (no hover state). */\n#undiscord #importBadge.import-badge { background: #5865f2; color: #ffffff; border-radius: 4px; padding: 3px 9px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin: 0; display: inline-flex; align-items: center; user-select: none; font-family: var(--_u-font-display); }\n/* When an import is loaded, the General queue + Search filter sections are\n   not consulted at run time. Grey their fieldsets and disable interaction so\n   the user can see at a glance which inputs apply. The <summary> stays\n   clickable so sections can still be collapsed/expanded for inspection.\n   The Delete filter section stays interactive — its working toggles (text,\n   link, image/video/sound) apply during the import-mode pre-pass. Toggles\n   that need data the export doesn't carry (sticker, poll, embed, forward,\n   mentions) are individually marked .import-noop and grey out below. */\n#undiscord.import-mode #sectionGeneral > fieldset,\n#undiscord.import-mode #sectionSearchFilter > fieldset { opacity: 0.4; pointer-events: none; filter: grayscale(0.4); }\n#undiscord.import-mode .import-noop { opacity: 0.4; pointer-events: none; filter: grayscale(0.4); }\n/* The Import section's summary uses the same gray as every other <summary>\n   when idle. When an import is loaded, .import-mode bumps the weight to 600\n   so the active state is visually distinct. */\n#undiscord.import-mode #sectionImport > summary { font-weight: 600; }\n/* Summary line under the file picker — a one-liner that fills in once parsing\n   finishes. Wraps because long timestamp ranges otherwise overflow the sidebar. */\n#undiscord #importSummary { font-size: 11px; color: var(--_u-text-muted); word-break: break-word; line-height: 1.4; }\n#undiscord.import-mode #importSummary { color: var(--_u-text); }\n";
+  __exports.default = "/* ============================================================================\n * PALETTE\n * ----------------------------------------------------------------------------\n * Self-contained dark palette pinned to hardcoded hex values — does not read\n * from Discord's --background-* / --text-* CSS variables, so custom themes\n * (BetterDiscord, Vencord, etc.) cannot recolour the panel. Centralised here\n * so the whole scheme can be retuned in one place without touching individual\n * rules.\n * ============================================================================ */\n#undiscord { --_u-bg-panel:        #2b2d31; --_u-bg-header:       #1e1f22; --_u-bg-sidebar:      #17181b; /* deliberately darker than --_u-bg-input so text fields visually sit on top of the sidebar instead of blending into it */   --_u-bg-main:         #313338; --_u-bg-toolbar:      #2b2d31; --_u-bg-input:        #1e1f22; --_u-bg-floating:     #111214; --_u-bg-hover:        #35373c; --_u-bg-accent:       #3f4147; --_u-bg-surface-high: #2b2d31; --_u-text:        #dbdee1; --_u-text-muted:  #949ba4; --_u-text-header: #f2f3f5; --_u-text-label:  #b5bac1; --_u-text-link:   #00a8fc; --_u-int:        #b5bac1; --_u-int-hover:  #dbdee1; --_u-int-active: #ffffff; --_u-int-muted:  #6d6f78; --_u-btn-secondary: #4e5058; --_u-btn-danger:    #da373c; --_u-border:       rgba(78, 80, 88, 0.48); --_u-input-border: #1e1f22; --_u-scrollbar-thumb: rgba(24, 25, 28, 0.6); --_u-scrollbar-track: transparent; --_u-shadow:        0 8px 16px rgba(0, 0, 0, 0.24); --_u-shadow-stroke: 0 0 0 1px rgba(0, 0, 0, 0.2); --_u-font-display:  'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif; }\n/* undiscord window */\n#undiscord.browser { box-shadow: var(--_u-shadow-stroke), var(--_u-shadow); border: 1px solid var(--_u-border); overflow: hidden; }\n#undiscord.container,\n#undiscord .container { background-color: var(--_u-bg-surface-high); border-radius: 8px; box-sizing: border-box; cursor: default; flex-direction: column; }\n#undiscord .header { background-color: var(--_u-bg-header); height: 48px; align-items: center; min-height: 48px; padding: 0 16px; display: flex; color: var(--_u-text-label); }\n#undiscord .header .icon { color: var(--_u-int); margin-right: 8px; flex-shrink: 0; width: 24; height: 24; }\n#undiscord .header .icon:hover { color: var(--_u-int-hover); }\n#undiscord .header h3 { font-size: 16px; line-height: 20px; font-weight: 500; font-family: var(--_u-font-display); color: var(--_u-text-header); flex-shrink: 0; margin-right: 16px; }\n#undiscord .spacer { flex-grow: 1; }\n#undiscord .header .vert-divider { width: 1px; height: 24px; background-color: var(--_u-bg-accent); margin-right: 16px; flex-shrink: 0; }\n#undiscord legend,\n#undiscord label { color: var(--_u-text-label); font-size: 12px; line-height: 16px; font-weight: 500; text-transform: uppercase; cursor: default; font-family: var(--_u-font-display); margin-bottom: 8px; }\n#undiscord .multiInput { display: flex; align-items: center; font-size: 16px; box-sizing: border-box; width: 100%; border-radius: 3px; color: var(--_u-text); background-color: var(--_u-bg-input); border: none; transition: border-color 0.2s ease-in-out 0s; }\n#undiscord .multiInput :first-child { flex-grow: 1; }\n#undiscord .multiInput button:last-child { margin-right: 4px; }\n#undiscord .multiInput button + button { margin-left: 3px; }\n#undiscord .input-actions { display: flex; gap: 4px; margin-top: 6px; }\n#undiscord .input-actions button { flex: 1; /* Tighter horizontal padding than the base 16px so longer labels (Select, Delete) fit. */     padding: 2px 6px; }\n/* Action button accents — set: tinge-darker gray, add: muted forest green, del: bordeaux. */\n#undiscord .input-actions button[id^=\"set\"]    { background-color: #3f4147; }\n#undiscord .input-actions button[id^=\"add\"]    { background-color: #3a7d4d; }\n#undiscord .input-actions button[id^=\"del\"]    { background-color: #722f37; }\n/* Select buttons: blue when idle, amber while waiting for a click, light purple\n   while waiting AND Shift is held (shift-lock — multi-capture mode). */\n#undiscord .input-actions button[id^=\"select\"]                       { background-color: #2c5d8e; }\n#undiscord .input-actions button[id^=\"select\"].active                { background-color: #b8860b; }\n#undiscord .input-actions button[id^=\"select\"].active.shift-locked   { background-color: #a78bfa; }\n/* Global crosshair cursor while any Select button is armed. */\nbody.undiscord-selecting,\nbody.undiscord-selecting * { cursor: crosshair !important; }\n/* Inline Clear buttons — sit absolutely on the right edge of any text-input\n   wrapper. The .clearable class on the input adds matching right padding so\n   typed text doesn't slide under the button. */\n#undiscord .input-wrapper { position: relative; }\n#undiscord input.clearable { padding-right: 60px; }\n#undiscord button.clear-btn { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: auto; min-width: 0; height: 28px; min-height: 28px; padding: 0 10px; font-size: 11px; font-weight: 500; background-color: #4e5058; color: var(--_u-text); border-radius: 4px; cursor: pointer; z-index: 1; }\n/* Date-preset shortcuts — green/amber/red traffic-light scaling with scope. */\n#undiscord .date-preset-day  { background-color: #3a7d4d; }\n#undiscord .date-preset-week { background-color: #b8860b; }\n#undiscord .date-preset-all  { background-color: #722f37; }\n/* Stepper rows for the delay controls. Compact buttons next to a read-only display. */\n#undiscord .stepper { display: flex; align-items: center; gap: 4px; margin-top: 6px; }\n/* Input is fixed at 100px and text-left-aligned so short values don't drift.\n   Stepper buttons (flex: 1) grow to fill the remaining horizontal space\n   equally. The input is editable — typed values auto-clamp on commit. */\n#undiscord .stepper input[type=\"text\"] { flex: 0 0 100px; text-align: left; cursor: text; }\n#undiscord .stepper button { flex: 1; width: auto; min-width: 32px; padding: 0; font-weight: 700; }\n#undiscord .stepper-down { background-color: #722f37; }\n#undiscord .stepper-up { background-color: #3a7d4d; }\n#undiscord .stepper-reset { background-color: #2c5d8e; }\n/* Compact help button — pinned to the top-right of its fieldset (sibling of the\n   legend, since <legend> rendering doesn't reliably honor display:flex). The\n   right edge sits flush with the input/control edges below it. */\n#undiscord fieldset { position: relative; }\n#undiscord button.help-btn { position: absolute; top: -23px; right: 0; width: auto; min-width: 0; height: 16px; min-height: 16px; padding: 0 6px; font-size: 10px; font-weight: 500; text-transform: uppercase; border: none; border-radius: 3px; background-color: #2c5d8e; color: #ffffff; cursor: pointer; }\n/* Tab-level help button: vertically centered inside the <summary>, right-aligned. */\n#undiscord summary button.help-btn { top: 50%; right: 8px; transform: translateY(-50%); }\n/* Has-type checkbox grid — 2 per row inside the Include filter. */\n#undiscord .has-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-bottom: 12px; }\n#undiscord .has-grid label { display: flex; align-items: center; margin-bottom: 0; text-transform: none; cursor: pointer; }\n#undiscord .has-grid input[type=\"checkbox\"] { margin-right: 6px; }\n/* Select dropdown styling — match the dark panel. */\n#undiscord select { background-color: var(--_u-bg-input); color: var(--_u-text); border: 1px solid var(--_u-input-border); border-radius: 4px; padding: 4px 6px; font-family: var(--_u-font-display); font-size: 14px; cursor: pointer; }\n/* Pill-style on/off toggle. Replaces every native checkbox visual inside the\n   panel: red when off, green when on. The .has-grid override below tightens\n   margin in the dense 2-column grids. */\n#undiscord input[type=\"checkbox\"] { appearance: none; -webkit-appearance: none; position: relative; width: 36px; height: 18px; margin: 0 8px 0 0; padding: 0; border: none; border-radius: 9px; background-color: #722f37; cursor: pointer; transition: background-color 0.2s ease; vertical-align: middle; flex-shrink: 0; }\n#undiscord input[type=\"checkbox\"]::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background-color: #ffffff; transition: transform 0.2s ease; }\n#undiscord input[type=\"checkbox\"]:checked { background-color: #3a7d4d; }\n#undiscord input[type=\"checkbox\"]:checked::after { transform: translateX(18px); }\n#undiscord .input { font-size: 16px; width: 100%; transition: border-color 0.2s ease-in-out 0s; padding: 10px; height: 44px; background-color: var(--_u-bg-input); border: 1px solid var(--_u-input-border); border-radius: 8px; box-sizing: border-box; color: var(--_u-text); }\n#undiscord fieldset { margin-top: 16px; }\n#undiscord .input-wrapper { display: flex; align-items: center; font-size: 16px; box-sizing: border-box; width: 100%; border-radius: 3px; color: var(--_u-text); background-color: var(--_u-bg-input); border: none; transition: border-color 0.2s ease-in-out 0s; }\n#undiscord input[type=\"text\"],\n#undiscord input[type=\"search\"],\n#undiscord input[type=\"password\"],\n#undiscord input[type=\"datetime-local\"],\n#undiscord input[type=\"number\"],\n#undiscord input[type=\"range\"] { background-color: var(--_u-bg-input); border: 1px solid var(--_u-input-border); border-radius: 8px; box-sizing: border-box; color: var(--_u-text); font-size: 16px; height: 44px; padding: 12px 10px; transition: border-color .2s ease-in-out; width: 100%; }\n#undiscord input[type=\"file\"] { color: var(--_u-text); }\n#undiscord hr { border: none; margin-bottom: 24px; padding-bottom: 4px; border-bottom: 1px solid var(--_u-bg-accent); }\n#undiscord .sectionDescription { margin-bottom: 16px; color: var(--_u-text-label); font-size: 14px; line-height: 20px; font-weight: 400; }\n#undiscord a { color: var(--_u-text-link); text-decoration: none; }\n#undiscord a:hover { text-decoration: underline; }\n#undiscord .btn,\n#undiscord button { position: relative; display: flex; -webkit-box-pack: center; justify-content: center; -webkit-box-align: center; align-items: center; box-sizing: border-box; background: none; border: none; border-radius: 3px; font-size: 14px; font-weight: 500; line-height: 16px; padding: 2px 16px; user-select: none; cursor: pointer; /* sizeSmall */     width: 60px; height: 32px; min-width: 60px; min-height: 32px; /* lookFilled colorPrimary */     color: #ffffff; background-color: var(--_u-btn-secondary); transition: background-color 0.15s ease, filter 0.15s ease; }\n#undiscord .btn:hover,\n#undiscord button:hover { filter: brightness(1.15); }\n#undiscord button:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }\n#undiscord .sizeMedium { width: 96px; height: 38px; min-width: 96px; min-height: 38px; }\n#undiscord .sizeMedium.icon { width: 38px; min-width: 38px; }\n#undiscord sup { vertical-align: top; }\n#undiscord .danger { background-color: var(--_u-btn-danger); }\n/* Verify-button accent — a darker navy than the existing #2c5d8e Select-button\n   blue so it reads as a distinct, secondary action and doesn't get mistaken\n   for a Select-mode trigger. */\n#undiscord .verify-mode { background-color: #1e4470; }\n/* Scrollbar */\n#undiscord .scroll::-webkit-scrollbar { width: 8px; height: 8px; }\n#undiscord .scroll::-webkit-scrollbar-corner { background-color: transparent; }\n#undiscord .scroll::-webkit-scrollbar-thumb { background-clip: padding-box; border: 2px solid transparent; border-radius: 4px; background-color: var(--_u-scrollbar-thumb); min-height: 40px; }\n#undiscord .scroll::-webkit-scrollbar-track { border-color: var(--_u-scrollbar-track); background-color: var(--_u-scrollbar-track); border: 2px solid var(--_u-scrollbar-track); }\n/* fade scrollbar */\n#undiscord .scroll::-webkit-scrollbar-thumb,\n#undiscord .scroll::-webkit-scrollbar-track { visibility: hidden; }\n#undiscord .scroll:hover::-webkit-scrollbar-thumb,\n#undiscord .scroll:hover::-webkit-scrollbar-track { visibility: visible; }\n#undiscord :disabled { display: none; }\n/**** layout and utility classes ****/\n#undiscord,\n#undiscord * { box-sizing: border-box; }\n#undiscord .col { display: flex; flex-direction: column; }\n#undiscord .row { display: flex; flex-direction: row; align-items: center; }\n#undiscord .mb1 { margin-bottom: 8px; }\n#undiscord .log { margin-bottom: 0.25em; }\n#undiscord .log-debug { color: var(--_u-text); }\n#undiscord .log-info { color: #00b0f4; }\n#undiscord .log-verb { color: var(--_u-text-muted); }\n#undiscord .log-warn { color: #faa61a; }\n#undiscord .log-error { color: #f04747; }\n#undiscord .log-success { color: #43b581; }\n/**** Undiscord Button (FAB) ****/\n#undiscord-btn { position: fixed; bottom: 20px; right: 20px; z-index: 99; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: #18191c; color: #b5bac1; border-radius: 50%; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3); cursor: pointer; transition: color 0.15s ease, transform 0.15s ease, background 0.15s ease; }\n#undiscord-btn:hover { color: #ffffff; background: #2e3035; transform: scale(1.05); }\n#undiscord-btn:focus-visible { outline: 2px solid #5865f2; outline-offset: 2px; }\n#undiscord-btn progress { position: absolute; bottom: 4px; left: 8px; width: 32px; height: 4px; display: none; }\n#undiscord-btn.running { color: #da373c !important; }\n#undiscord-btn.running progress { display: block; }\n/**** Undiscord Interface ****/\n#undiscord { position: fixed; z-index: 100; top: 58px; right: 10px; display: flex; flex-direction: column; width: 800px; height: 80vh; min-width: 610px; max-width: 100vw; min-height: 448px; max-height: 100vh; color: var(--_u-text); border-radius: 4px; background-color: var(--_u-bg-panel); box-shadow: var(--_u-shadow-stroke), var(--_u-shadow); will-change: top, left, width, height; }\n#undiscord .header .icon { cursor: pointer; }\n#undiscord .window-body { height: calc(100% - 48px); }\n#undiscord .sidebar { /* Always reserve scrollbar space — overflow-y: scroll keeps the gutter\n       even when content fits, so right-aligned elements don't shift when the\n       sidebar starts overflowing. Fade-on-hover .scroll rules still hide the\n       bar visually until mouseover. */\n    overflow-x: hidden; overflow-y: scroll; /* flex-shrink: 0 locks the sidebar at its target width regardless of what\n       .main wants — without it, log content growing inside .main pulls space\n       from the sidebar via the flex layout, shifting everything in here. */\n    width: 270px; flex-shrink: 0; height: 100%; max-height: 100%; padding: 8px; background: var(--_u-bg-sidebar); }\n#undiscord .sidebar legend,\n#undiscord .sidebar label { display: block; width: 100%; }\n#undiscord .main { display: flex; max-width: calc(100% - 250px); background-color: var(--_u-bg-main); flex-grow: 1; }\n#undiscord #logArea { font-family: Consolas, Liberation Mono, Menlo, Courier, monospace; font-size: 0.75rem; overflow: auto; padding: 10px; user-select: text; flex-grow: 1; cursor: auto; /* Wrap long lines at the panel's right edge instead of overflowing horizontally.\n       pre-wrap preserves intentional whitespace; overflow-wrap breaks unbroken\n       strings (URLs, snowflakes) when no whitespace is available to wrap on. */\n    white-space: pre-wrap; overflow-wrap: break-word; }\n#undiscord .tbar { padding: 8px; background-color: var(--_u-bg-toolbar); }\n#undiscord .tbar button { margin-right: 4px; margin-bottom: 4px; }\n/* Top-bar status line. Idle state: a queue/import summary or empty-queue hint.\n   Running state: live progress text (percent / value / elapsed / remaining).\n   Lives inside #topBarSlot which is the first row of the top toolbar above the\n   log area; the second row holds the visual <progress> element. */\n#undiscord #topBarSlot { flex-grow: 1; min-height: 20px; }\n#undiscord .status-line { padding: 2px 6px; font-size: 13px; color: var(--_u-text-muted); line-height: 20px; }\n#undiscord .status-line.status-empty { font-style: italic; }\n#undiscord .status-line.status-running { color: var(--_u-text); font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace; font-size: 12px; letter-spacing: 0.2px; }\n/**** Elements ****/\n#undiscord summary { font-size: 16px; font-weight: 500; line-height: 20px; position: relative; overflow: hidden; margin-bottom: 2px; padding: 6px 10px; cursor: pointer; white-space: nowrap; text-overflow: ellipsis; color: var(--_u-int); border-radius: 4px; flex-shrink: 0; }\n#undiscord summary:hover { color: var(--_u-int-hover); background-color: var(--_u-bg-hover); }\n#undiscord fieldset { padding-left: 8px; }\n#undiscord legend a { float: right; text-transform: initial; }\n#undiscord progress { height: 8px; margin-top: 4px; flex-grow: 1; }\n#undiscord .importJson { display: flex; flex-direction: row; }\n#undiscord .importJson button { margin-left: 5px; width: fit-content; }\n/**** Drag/resize handles ****/\n[name^=\"grab-\"] { position: absolute; --size: 6px; --corner-size: 16px; --offset: -1px; z-index: 9; }\n[name^=\"grab-\"]:hover { background: rgba(128, 128, 128, 0.1); }\n[name=\"grab-t\"] { top: 0; left: var(--corner-size); right: var(--corner-size); height: var(--size); margin-top: var(--offset); cursor: ns-resize; }\n[name=\"grab-r\"] { top: var(--corner-size); bottom: var(--corner-size); right: 0; width: var(--size); margin-right: var(--offset); cursor: ew-resize; }\n[name=\"grab-b\"] { bottom: 0; left: var(--corner-size); right: var(--corner-size); height: var(--size); margin-bottom: var(--offset); cursor: ns-resize; }\n[name=\"grab-l\"] { top: var(--corner-size); bottom: var(--corner-size); left: 0; width: var(--size); margin-left: var(--offset); cursor: ew-resize; }\n[name=\"grab-tl\"] { top: 0; left: 0; width: var(--corner-size); height: var(--corner-size); margin-top: var(--offset); margin-left: var(--offset); cursor: nwse-resize; }\n[name=\"grab-tr\"] { top: 0; right: 0; width: var(--corner-size); height: var(--corner-size); margin-top: var(--offset); margin-right: var(--offset); cursor: nesw-resize; }\n[name=\"grab-br\"] { bottom: 0; right: 0; width: var(--corner-size); height: var(--corner-size); margin-bottom: var(--offset); margin-right: var(--offset); cursor: nwse-resize; }\n[name=\"grab-bl\"] { bottom: 0; left: 0; width: var(--corner-size); height: var(--corner-size); margin-bottom: var(--offset); margin-left: var(--offset); cursor: nesw-resize; }\n/**** Decorative resize indicator + cursor hints ****/\n#undiscord .header { cursor: grab; }\n#undiscord .footer { cursor: se-resize; padding-right: 30px; }\n.resize-handle { position: absolute; bottom: -15px; right: -15px; width: 30px; height: 30px; transform: rotate(-45deg); background: repeating-linear-gradient(0, var(--_u-bg-accent), var(--_u-bg-accent) 1px, transparent 2px, transparent 4px); cursor: nwse-resize; }\n/* ============================================================================\n * SERVER-BAR TRASH ICON\n * ----------------------------------------------------------------------------\n * Injected into Discord's left rail between the DM/Home separator and the\n * first server. Mimics Discord's server-icon shape-morph: circle at rest,\n * rounded square on hover/active. Lives outside #undiscord, so selectors\n * are global.\n * ============================================================================ */\n#undiscord-server-btn { display: flex; align-items: center; justify-content: center; width: 100%; height: 48px; cursor: pointer; position: relative; user-select: none; }\n#undiscord-server-btn .udl-blob { width: 40px; height: 40px; border-radius: 50%; background-color: #1e1f22; color: #b5bac1; display: flex; align-items: center; justify-content: center; position: relative; transition: border-radius 0.15s ease, background-color 0.15s ease, color 0.15s ease; }\n#undiscord-server-btn:hover .udl-blob { border-radius: 16px; background-color: #da373c; color: #ffffff; }\n#undiscord-server-btn.running .udl-blob { border-radius: 16px; background-color: #da373c; color: #ffffff; }\n#undiscord-server-btn .udl-progress { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 28px; height: 4px; display: none; }\n#undiscord-server-btn.running .udl-progress { display: block; }\n/* Stoplight-amber progress on white track — grows as deletes complete, contrasts\n   cleanly against the red running-state blob. */\n#undiscord-server-btn .udl-progress::-webkit-progress-bar { background-color: #ffffff; border-radius: 2px; }\n#undiscord-server-btn .udl-progress::-webkit-progress-value { background-color: #b8860b; border-radius: 2px; transition: width 0.2s ease; }\n#undiscord-server-btn .udl-progress::-moz-progress-bar { background-color: #b8860b; border-radius: 2px; }\n/* ============================================================================\n * STREAMER MODE\n * ----------------------------------------------------------------------------\n * When the Streamer mode toggle is on (panel root carries .streamer-on),\n * every input field that holds a Discord ID renders its value as dots so\n * screen recordings, streams, and shoulder-surfing don't leak user / server\n * / channel / message IDs. Placeholders stay readable. The text-content\n * filter inputs, date pickers, and delay steppers stay readable too — those\n * don't carry sensitive IDs.\n *\n * `text-security` is the unprefixed proposed standard; `-webkit-text-security`\n * is what Chromium / Discord's Electron client honours today.\n * ============================================================================ */\n#undiscord.streamer-on input#authorId,\n#undiscord.streamer-on input#guildId,\n#undiscord.streamer-on input#channelId,\n#undiscord.streamer-on input#mentionsId,\n#undiscord.streamer-on input#excludeMentionsId,\n#undiscord.streamer-on input#minId,\n#undiscord.streamer-on input#maxId,\n#undiscord.streamer-on input#importExcludeServers,\n#undiscord.streamer-on input#importExcludeChannels,\n#undiscord.streamer-on input#importExcludeUsers { -webkit-text-security: disc; text-security: disc; }\n/* Dual-span redaction for log lines. Every log redaction emits both a `.sm-real`\n   span (the actual value) and a `.sm-redacted` span (the dotted placeholder); CSS shows exactly one of them based on whether `.streamer-on` is set on the\n   panel root. Toggling streamer mode mid-run instantly re-renders every\n   already-printed log line — no log replay needed. */\n#undiscord .sm-redacted { display: none; }\n#undiscord.streamer-on .sm-real { display: none; }\n#undiscord.streamer-on .sm-redacted { display: inline; }\n/* ============================================================================\n * SIDEBAR ACTION GROUP\n * ----------------------------------------------------------------------------\n * Pinned at the top of the sidebar above all <details> sections. Two stacked\n * full-width buttons: the primary action (#start) on row 1, Clear Log on\n * row 2. The primary's text / class / handler toggles between \"▶︎ Delete\"\n * (idle, red) and \"🛑 Stop\" (running, red) — same physical button, two\n * roles, no layout reflow when a run starts.\n * ============================================================================ */\n#undiscord #sidebarActions { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }\n#undiscord #sidebarActions > button { width: 100%; min-width: 0; height: 38px; min-height: 38px; padding: 2px 6px; }\n/* Reset / Batch selection row — two equally-wide buttons under the Delete /\n   Verify / Clear log group. Reset Selection wipes the form back to defaults; Batch Selection snapshots the form into the meta-batch queue and resets. */\n#undiscord #sidebarSelectionRow { display: flex; flex-direction: row; gap: 4px; margin-bottom: 6px; }\n#undiscord #sidebarSelectionRow > button { flex: 1; width: auto; min-width: 0; height: 32px; min-height: 32px; padding: 2px 6px; }\n#undiscord .reset-selection { background-color: #4e5058; }\n/* Same forest green as the per-section Add buttons — reads as \"additive\"\n   alongside Reset Selection's neutral grey. The queue count lives in the\n   amber badge below, not in the button label. */\n#undiscord .queue-selection { background-color: #3a7d4d; }\n/* Centred badge row directly below the action buttons. When every badge is\n   hidden the row still occupies a few px of vertical space above the <hr> —\n   visually negligible (~4px), and avoids the fragility of selecting on inline\n   display:none across HTML/JS serialization quirks. */\n#undiscord #sidebarBadgeRow { text-align: center; margin-bottom: 4px; display: flex; flex-direction: row; justify-content: center; gap: 6px; flex-wrap: wrap; }\n/* Queue counter badge — shown next to the import-mode chip when one or more\n   selection snapshots are queued. Same pill geometry, different colour so the\n   two states are visually distinct at a glance. */\n#undiscord #queueBadge.queue-badge { background: #b8860b; color: #ffffff; border-radius: 4px; padding: 3px 9px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin: 0; display: inline-flex; align-items: center; user-select: none; font-family: var(--_u-font-display); }\n/* Drop-batches chip — same pill geometry as the queue counter, but bordeaux\n   red (matching the global Delete button accents elsewhere) since it's\n   destructive. Shown to the left of the queue counter only when the queue\n   is non-empty. Overrides the global #undiscord button rules so it sizes as\n   a chip rather than a 60×32 button. */\n#undiscord #dropBatches.drop-batches { background: #722f37; color: #ffffff; border-radius: 4px; padding: 3px 9px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin: 0; width: auto; min-width: 0; height: auto; min-height: 0; display: inline-flex; align-items: center; user-select: none; font-family: var(--_u-font-display); cursor: pointer; }\n/* Mini-header for grouped pill toggles (\"Exclude all\" above the import-mode\n   wildcards). Mirrors the legend look — uppercase, label colour, modest size\n   — without the full fieldset border, since these pills are a sub-group of\n   their parent fieldset rather than a peer. */\n#undiscord .pill-group-label { margin-top: 12px; margin-bottom: 4px; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px; color: var(--_u-text-label); }\n/* Import-mode exclusion pills — three checkboxes styled as compact toggles\n   beneath the Exclude-all mini-header. Reuses the global pill checkbox visual\n   but arranges them in a horizontal grid that wraps on narrow widths. */\n#undiscord .import-type-pills { display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px 12px; }\n#undiscord .import-type-pills label.pill { display: inline-flex; align-items: center; margin-bottom: 0; text-transform: none; font-size: 12px; font-weight: 500; cursor: pointer; color: var(--_u-text-label); }\n#undiscord .import-type-pills label.pill input[type=\"checkbox\"] { margin-right: 6px; }\n/* ============================================================================\n * FOOTER TOGGLES\n * ----------------------------------------------------------------------------\n * Streamer mode + Auto scroll inline labels in the footer row, plus the live\n * elapsed/remaining readout pinned to the footer's left edge during a run.\n * ============================================================================ */\n/* Tighter spacing and no uppercase styling (overrides the global label rule). */\n#undiscord .footer .footer-toggle { margin-bottom: 0; margin-right: 12px; text-transform: none; font-size: 13px; font-weight: 400; cursor: pointer; }\n/* Live elapsed/remaining readout — populated by onProgress, cleared by onStop.\n   Tied to the LEFT edge of the footer (the spacer pushes the toggles right).\n   Empty when idle, monospace+muted when active so the digits don't shift. */\n#undiscord .footer #footerTime { font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace; font-size: 12px; color: var(--_u-text-muted); letter-spacing: 0.2px; padding-left: 4px; }\n/* ============================================================================\n * IMPORT MODE\n * ----------------------------------------------------------------------------\n * Status chip + section greying when an export is loaded. The General queue\n * and Search filter sections grey out (the import IS the queue); individual\n * Skip-filter toggles whose data isn't carried by the export grey out\n * separately via the .import-noop class.\n * ============================================================================ */\n/* The \"import mode\" status chip — shown in the sidebar's badge row when an\n   export is loaded. Discord-blurple, reads as a status indicator (no hover state). */\n#undiscord #importBadge.import-badge { background: #5865f2; color: #ffffff; border-radius: 4px; padding: 3px 9px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin: 0; display: inline-flex; align-items: center; user-select: none; font-family: var(--_u-font-display); }\n/* When an import is loaded, the General queue + Search filter sections are\n   not consulted at run time. Grey their fieldsets and disable interaction so\n   the user can see at a glance which inputs apply. The <summary> stays\n   clickable so sections can still be collapsed/expanded for inspection.\n   The Delete filter section stays interactive — its working toggles (text,\n   link, image/video/sound) apply during the import-mode pre-pass. Toggles\n   that need data the export doesn't carry (sticker, poll, embed, forward,\n   mentions) are individually marked .import-noop and grey out below. */\n#undiscord.import-mode #sectionGeneral > fieldset,\n#undiscord.import-mode #sectionSearchFilter > fieldset { opacity: 0.4; pointer-events: none; filter: grayscale(0.4); }\n#undiscord.import-mode .import-noop { opacity: 0.4; pointer-events: none; filter: grayscale(0.4); }\n/* The Import section's summary uses the same gray as every other <summary>\n   when idle. When an import is loaded, .import-mode bumps the weight to 600\n   so the active state is visually distinct. */\n#undiscord.import-mode #sectionImport > summary { font-weight: 600; }\n/* Summary line under the file picker — a one-liner that fills in once parsing\n   finishes. Wraps because long timestamp ranges otherwise overflow the sidebar. */\n#undiscord #importSummary { font-size: 11px; color: var(--_u-text-muted); word-break: break-word; line-height: 1.4; }\n#undiscord.import-mode #importSummary { color: var(--_u-text); }\n";
 };
 
 __modules["src/ui/undiscord.html"] = (__exports) => {
-  __exports.default = "<div id=\"undiscord\" class=\"browser container\" style=\"display:none;\">\n    <div class=\"header\">\n        <svg class=\"icon\" aria-hidden=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\">\n            <path fill=\"currentColor\" d=\"M15 3.999V2H9V3.999H3V5.999H21V3.999H15Z\"></path>\n            <path fill=\"currentColor\"\n                d=\"M5 6.99902V18.999C5 20.101 5.897 20.999 7 20.999H17C18.103 20.999 19 20.101 19 18.999V6.99902H5ZM11 17H9V11H11V17ZM15 17H13V11H15V17Z\">\n            </path>\n        </svg>\n        <h3>Undiscord Lite</h3>\n        <div class=\"vert-divider\"></div>\n        <span> Bulk delete messages</span>\n        <div class=\"spacer\"></div>\n        <div id=\"hide\" class=\"icon\" aria-label=\"Minimize\" role=\"button\" tabindex=\"0\" title=\"Minimize (run continues in background)\">\n            <svg aria-hidden=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\">\n                <path fill=\"currentColor\" d=\"M5 18h14v3H5z\"></path>\n            </svg>\n        </div>\n    </div>\n    <div class=\"window-body\" style=\"display: flex; flex-direction: row;\">\n        <div class=\"sidebar scroll\">\n            <div id=\"sidebarActions\">\n                <button id=\"start\" class=\"danger\" title=\"Start the deletion process\">▶︎ Delete</button>\n                <button id=\"verify\" class=\"verify-mode\" title=\"Print the current run configuration to the log so you can sanity-check it before clicking Delete.\">📋 Verify</button>\n                <button id=\"clear\" title=\"Clear the log area\">🗑️ Clear Log</button>\n            </div>\n            <div id=\"sidebarBadgeRow\">\n                <span id=\"importBadge\" class=\"import-badge\" style=\"display:none;\" title=\"An imported export is loaded. The General queue, Search filter, and Delete filter sections are ignored — only Date and Messages interval still apply.\">import mode</span>\n            </div>\n            <hr>\n            <details id=\"sectionGeneral\" open>\n                <summary>General<button class=\"help-btn\" data-help=\"tabGeneral\" title=\"Show help for the General tab\">Help</button></summary>\n                <fieldset>\n                    <legend>Author ID</legend>\n                    <button class=\"help-btn\" data-help=\"authorId\" title=\"Show help for Author ID\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"input clearable\" id=\"authorId\" type=\"text\">\n                        <button class=\"clear-btn\" id=\"clearAuthor\" title=\"Clear Author ID\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"getAuthor\">Me</button>\n                        <button id=\"selectAuthor\" title=\"Click, then click a user or message in Discord to capture their User ID. Hold Shift to capture multiple in a row.\">Select</button>\n                    </div>\n                    <div class=\"sectionDescription\" style=\"margin-top: 6px;\">\n                        <label class=\"row\" style=\"margin-bottom: 0;\" title=\"When checked, age-gated NSFW channels are excluded from Discord's search results. Default: off (NSFW channels are included).\">\n                            <input id=\"excludeNsfw\" type=\"checkbox\">\n                            Exclude NSFW channels\n                        </label>\n                    </div>\n                </fieldset>\n                <hr>\n                <fieldset>\n                    <legend>Server ID</legend>\n                    <button class=\"help-btn\" data-help=\"serverId\" title=\"Show help for Server ID\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"input clearable\" id=\"guildId\" type=\"text\">\n                        <button class=\"clear-btn\" id=\"clearGuild\" title=\"Clear Server (also clears Channel)\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"addGuild\" title=\"Queue the server you're currently viewing for a server-wide wipe.\">Add</button>\n                        <button id=\"delGuild\" title=\"Remove the server you're currently viewing from the queue.\">Delete</button>\n                        <button id=\"selectGuild\" title=\"Click, then click a server icon in Discord to capture its ID\">Select</button>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Channel ID</legend>\n                    <button class=\"help-btn\" data-help=\"channelId\" title=\"Show help for Channel ID\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"input clearable\" id=\"channelId\" type=\"text\">\n                        <button class=\"clear-btn\" id=\"clearChannel\" title=\"Clear Channel only\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"addChannel\" title=\"Queue the channel you're currently viewing.\">Add</button>\n                        <button id=\"delChannel\" title=\"Remove the channel you're currently viewing from the queue.\">Delete</button>\n                        <button id=\"selectChannel\" title=\"Click, then click a channel or message in Discord to capture its ID\">Select</button>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend style=\"text-transform: none;\">DMs</legend>\n                    <button class=\"help-btn\" data-help=\"dms\" title=\"Show help for DMs\">Help</button>\n                    <div class=\"input-actions\">\n                        <button id=\"addAllDms\" title=\"Queue every DM channel currently open in your sidebar\">Add DMs</button>\n                        <button id=\"delAllDms\" title=\"Remove every queued DM channel from the queue\">Clear DMs</button>\n                    </div>\n                    <div class=\"sectionDescription\" style=\"margin-top: 3px;\">\n                        <label class=\"row\" style=\"margin-bottom: 0;\" title=\"When checked, group DMs are excluded from the bulk Add DMs action. Default: off (group DMs are included).\">\n                            <input id=\"excludeGroupDms\" type=\"checkbox\">\n                            Exclude group DMs\n                        </label>\n                    </div>\n                </fieldset>\n            </details>\n            <hr>\n            <details id=\"sectionImport\">\n                <summary>Import data export<button class=\"help-btn\" data-help=\"importExport\" title=\"Show help for Import data export\">Help</button></summary>\n                <fieldset>\n                    <legend>Import folder</legend>\n                    <button class=\"help-btn\" data-help=\"importFolder\" title=\"Show help for picking the import folder\">Help</button>\n                    <input id=\"importPicker\" type=\"file\" webkitdirectory directory multiple style=\"display:none;\">\n                    <div class=\"input-actions\">\n                        <button id=\"importPick\" title=\"Pick the unzipped 'messages/' folder of your Discord data export\">Select Folder...</button>\n                        <button id=\"importClear\" title=\"Clear the loaded import and return to live-search mode\">Clear Import</button>\n                    </div>\n                    <div id=\"importSummary\" class=\"sectionDescription\" style=\"margin-top: 6px;\">No import loaded.</div>\n                </fieldset>\n                <fieldset>\n                    <legend>Exclude Server</legend>\n                    <button class=\"help-btn\" data-help=\"importExcludeServer\" title=\"Show help for Exclude Server\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"importExcludeServers\" type=\"text\" placeholder=\"Server ID(s) to skip — comma-separated\">\n                        <button class=\"clear-btn\" id=\"clearImportExcludeServers\" title=\"Clear excluded servers\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"addImportExcludeServers\" title=\"Add the server you're currently viewing to the exclusion list. @me is allowed (skips every DM).\">Add</button>\n                        <button id=\"delImportExcludeServers\" title=\"Remove the server you're currently viewing from the exclusion list.\">Delete</button>\n                        <button id=\"selectImportExcludeServers\" title=\"Click, then click a server icon in Discord to capture its ID. Hold Shift to capture several in a row.\">Select</button>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Exclude Channel</legend>\n                    <button class=\"help-btn\" data-help=\"importExcludeChannel\" title=\"Show help for Exclude Channel\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"importExcludeChannels\" type=\"text\" placeholder=\"Channel ID(s) to skip — comma-separated\">\n                        <button class=\"clear-btn\" id=\"clearImportExcludeChannels\" title=\"Clear excluded channels\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"addImportExcludeChannels\" title=\"Add the channel you're currently viewing to the exclusion list.\">Add</button>\n                        <button id=\"delImportExcludeChannels\" title=\"Remove the channel you're currently viewing from the exclusion list.\">Delete</button>\n                        <button id=\"selectImportExcludeChannels\" title=\"Click, then click a channel or any message inside one to capture the channel ID. Hold Shift to capture several in a row.\">Select</button>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Exclude DM with User</legend>\n                    <button class=\"help-btn\" data-help=\"importExcludeUser\" title=\"Show help for Exclude DM with User\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"importExcludeUsers\" type=\"text\" placeholder=\"User ID(s) — DMs/group DMs with these users will skip\">\n                        <button class=\"clear-btn\" id=\"clearImportExcludeUsers\" title=\"Clear excluded users\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"selectImportExcludeUsers\" title=\"Click, then click an avatar/username in Discord to capture the user ID. Hold Shift to capture several in a row.\">Select</button>\n                    </div>\n                </fieldset>\n            </details>\n            <hr>\n            <details id=\"sectionSearchFilter\">\n                <summary>Search filter<button class=\"help-btn\" data-help=\"tabSearchFilter\" title=\"Show help for the Search filter tab\">Help</button></summary>\n                <fieldset>\n                    <legend>Include text</legend>\n                    <button class=\"help-btn\" data-help=\"includeText\" title=\"Show help for Include text\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"search\" type=\"text\" placeholder=\"Containing text\">\n                        <button class=\"clear-btn\" id=\"clearSearch\" title=\"Clear Include text\">Clear</button>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Include attachment type</legend>\n                    <button class=\"help-btn\" data-help=\"includeAttachment\" title=\"Show help for Include attachment type\">Help</button>\n                    <div class=\"has-grid\">\n                        <label><input id=\"hasLink\"    type=\"checkbox\">Link</label>\n                        <label><input id=\"hasImage\"   type=\"checkbox\">Image</label>\n                        <label><input id=\"hasVideo\"   type=\"checkbox\">Video</label>\n                        <label><input id=\"hasSound\"   type=\"checkbox\">Sound</label>\n                        <label><input id=\"hasSticker\" type=\"checkbox\">Sticker</label>\n                        <label><input id=\"hasPoll\"    type=\"checkbox\">Poll</label>\n                        <label><input id=\"hasEmbed\"   type=\"checkbox\">Embed</label>\n                        <label><input id=\"hasForward\" type=\"checkbox\">Forward</label>\n                    </div>\n                    <div class=\"sectionDescription\" style=\"margin-top: 8px;\">\n                        <label class=\"row\" style=\"margin-bottom: 0;\">Pinned:&nbsp;\n                            <select id=\"pinnedMode\">\n                                <option value=\"exclude\" selected>exclude</option>\n                                <option value=\"include\">include</option>\n                                <option value=\"only\">only pinned</option>\n                            </select>\n                        </label>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Include @user</legend>\n                    <button class=\"help-btn\" data-help=\"includeUser\" title=\"Show help for Include @user\">Help</button>\n                    <div class=\"sectionDescription\">\n                        <label><input id=\"mentionEveryone\" type=\"checkbox\">Include @everyone / @here</label>\n                    </div>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"mentionsId\" type=\"text\" placeholder=\"Mentions user ID\">\n                        <button class=\"clear-btn\" id=\"clearMentions\" title=\"Clear Mentions user IDs\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"selectMentions\" title=\"Click, then click a user or message in Discord to capture their User ID\">Select</button>\n                    </div>\n                </fieldset>\n            </details>\n            <hr>\n            <details id=\"sectionDeleteFilter\">\n                <summary>Delete filter<button class=\"help-btn\" data-help=\"tabDeleteFilter\" title=\"Show help for the Delete filter tab\">Help</button></summary>\n                <fieldset>\n                    <legend>Skip text</legend>\n                    <button class=\"help-btn\" data-help=\"excludeText\" title=\"Show help for Skip text\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"excludeSearch\" type=\"text\" placeholder=\"Skip messages containing\">\n                        <button class=\"clear-btn\" id=\"clearExcludeSearch\" title=\"Clear Skip text\">Clear</button>\n                    </div>\n                    <div class=\"sectionDescription\" style=\"margin-top: 6px;\">\n                        <label class=\"row\" style=\"margin-bottom: 0;\" title=\"Substring: term appears anywhere in the message. Exact: term must appear as a standalone word.\">Match:&nbsp;\n                            <select id=\"excludeMatchMode\">\n                                <option value=\"substring\" selected>substring</option>\n                                <option value=\"exact\">exact</option>\n                            </select>\n                        </label>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Skip attachment type</legend>\n                    <button class=\"help-btn\" data-help=\"excludeAttachment\" title=\"Show help for Skip attachment type\">Help</button>\n                    <div class=\"has-grid\">\n                        <label><input id=\"excludeLink\"    type=\"checkbox\">Link</label>\n                        <label><input id=\"excludeImage\"   type=\"checkbox\">Image</label>\n                        <label><input id=\"excludeVideo\"   type=\"checkbox\">Video</label>\n                        <label><input id=\"excludeSound\"   type=\"checkbox\">Sound</label>\n                        <label class=\"import-noop\" title=\"Stickers aren't carried in the Discord data export — this toggle has no effect in import mode.\"><input id=\"excludeSticker\" type=\"checkbox\">Sticker</label>\n                        <label class=\"import-noop\" title=\"Polls aren't carried in the Discord data export — this toggle has no effect in import mode.\"><input id=\"excludePoll\"    type=\"checkbox\">Poll</label>\n                        <label class=\"import-noop\" title=\"Embeds aren't carried in the Discord data export — this toggle has no effect in import mode.\"><input id=\"excludeEmbed\"   type=\"checkbox\">Embed</label>\n                        <label class=\"import-noop\" title=\"Forward metadata isn't carried in the Discord data export — this toggle has no effect in import mode.\"><input id=\"excludeForward\" type=\"checkbox\">Forward</label>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Skip extension</legend>\n                    <button class=\"help-btn\" data-help=\"excludeExtension\" title=\"Show help for Skip extension\">Help</button>\n                    <div class=\"has-grid\">\n                        <label><input type=\"checkbox\" data-ext=\"jpg\">.jpg</label>\n                        <label><input type=\"checkbox\" data-ext=\"png\">.png</label>\n                        <label><input type=\"checkbox\" data-ext=\"mp4\">.mp4</label>\n                        <label><input type=\"checkbox\" data-ext=\"webm\">.webm</label>\n                        <label><input type=\"checkbox\" data-ext=\"pdf\">.pdf</label>\n                        <label><input type=\"checkbox\" data-ext=\"docx\">.docx</label>\n                        <label><input type=\"checkbox\" data-ext=\"txt\">.txt</label>\n                        <label><input type=\"checkbox\" data-ext=\"zip\">.zip</label>\n                    </div>\n                    <div class=\"input-wrapper\" style=\"margin-top: 8px;\">\n                        <input class=\"clearable\" id=\"excludeExtensions\" type=\"text\" placeholder=\"Custom: .ext1;.ext2;.ext3\">\n                        <button class=\"clear-btn\" id=\"clearExcludeExtensions\" title=\"Clear custom extensions\">Clear</button>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Skip @user</legend>\n                    <button class=\"help-btn\" data-help=\"excludeUser\" title=\"Show help for Skip @user\">Help</button>\n                    <div class=\"sectionDescription\">\n                        <label><input id=\"excludeMentionEveryone\" type=\"checkbox\">skip @everyone / @here</label>\n                    </div>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"excludeMentionsId\" type=\"text\" placeholder=\"Mentions user ID\">\n                        <button class=\"clear-btn\" id=\"clearExcludeMentions\" title=\"Clear Skip mentions user IDs\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"selectExcludeMentions\" title=\"Click, then click a user or message in Discord to capture their User ID\">Select</button>\n                    </div>\n                </fieldset>\n            </details>\n            <hr>\n            <details>\n                <summary>Messages interval<button class=\"help-btn\" data-help=\"tabMessagesInterval\" title=\"Show help for the Messages interval tab\">Help</button></summary>\n                <fieldset>\n                    <legend>Interval of messages</legend>\n                    <button class=\"help-btn\" data-help=\"messagesInterval\" title=\"Show help for Messages interval\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"minId\" type=\"text\" placeholder=\"After a message ID\">\n                        <button class=\"clear-btn\" id=\"clearMinId\" title=\"Clear After message ID\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\" style=\"margin-bottom: 5px;\">\n                        <button id=\"selectMinId\" title=\"Click, then click a message in Discord to capture its ID as the After bound\">Select</button>\n                    </div>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"maxId\" type=\"text\" placeholder=\"Before a message ID\">\n                        <button class=\"clear-btn\" id=\"clearMaxId\" title=\"Clear Before message ID\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"selectMaxId\" title=\"Click, then click a message in Discord to capture its ID as the Before bound\">Select</button>\n                    </div>\n                </fieldset>\n            </details>\n            <hr>\n            <details>\n                <summary>Date interval<button class=\"help-btn\" data-help=\"tabDateInterval\" title=\"Show help for the Date interval tab\">Help</button></summary>\n                <fieldset>\n                    <legend>After date</legend>\n                    <button class=\"help-btn\" data-help=\"dateInterval\" title=\"Show help for Date interval\">Help</button>\n                    <div class=\"input-wrapper mb1\">\n                        <input id=\"minDate\" type=\"datetime-local\" value=\"2015-01-01T00:00\" title=\"Messages posted AFTER this date (defaults to Discord's launch — clear or change as needed)\">\n                    </div>\n                    <legend>Before date</legend>\n                    <div class=\"input-wrapper\">\n                        <input id=\"maxDate\" type=\"datetime-local\" title=\"Messages posted BEFORE this date\">\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"datePresetDay\"  class=\"date-preset-day\"  title=\"Now − 24 hours\">1 Day</button>\n                        <button id=\"datePresetWeek\" class=\"date-preset-week\" title=\"Now − 7 days\">1 Week</button>\n                        <button id=\"datePresetAll\"  class=\"date-preset-all\"  title=\"Reset After to 2015 and clear Before\">All</button>\n                    </div>\n                </fieldset>\n            </details>\n            <hr>\n            <details>\n                <summary>Delay settings<button class=\"help-btn\" data-help=\"tabAdvanced\" title=\"Show help for the Delay settings section\">Help</button></summary>\n                <fieldset>\n                    <legend>Search delay (ms)</legend>\n                    <button class=\"help-btn\" data-help=\"searchDelay\" title=\"Show help for Search delay\">Help</button>\n                    <div class=\"stepper\">\n                        <input id=\"searchDelay\" type=\"text\" title=\"Click to type a value (auto-clamps to 15000–60000 ms)\">\n                        <button id=\"searchDelayDown\" class=\"stepper-down\" title=\"−500 ms\">&lt;</button>\n                        <button id=\"searchDelayUp\" class=\"stepper-up\" title=\"+500 ms\">&gt;</button>\n                        <button id=\"searchDelayReset\" class=\"stepper-reset\" title=\"Reset to default\">↺</button>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Delete delay (ms)</legend>\n                    <button class=\"help-btn\" data-help=\"deleteDelay\" title=\"Show help for Delete delay\">Help</button>\n                    <div class=\"stepper\">\n                        <input id=\"deleteDelay\" type=\"text\" title=\"Click to type a value (auto-clamps to 100–3000 ms)\">\n                        <button id=\"deleteDelayDown\" class=\"stepper-down\" title=\"−50 ms\">&lt;</button>\n                        <button id=\"deleteDelayUp\" class=\"stepper-up\" title=\"+50 ms\">&gt;</button>\n                        <button id=\"deleteDelayReset\" class=\"stepper-reset\" title=\"Reset to default\">↺</button>\n                    </div>\n                </fieldset>\n            </details>\n        </div>\n        <div class=\"main col\">\n            <div class=\"tbar col\" id=\"topBar\">\n                <div class=\"row\" id=\"topBarSlot\">\n                    <!-- Run-status text — populated by renderTopBar() (idle) or onProgress (running). -->\n                </div>\n                <div class=\"row\">\n                    <progress id=\"progressBar\" style=\"display:none;\"></progress>\n                </div>\n            </div>\n            <pre id=\"logArea\" class=\"logarea scroll\"></pre>\n            <div class=\"tbar footer row\">\n                <div id=\"footerTime\"></div>\n                <span class=\"spacer\"></span>\n                <label class=\"row footer-toggle\" title=\"Redact message content AND usernames in the log + confirmation preview\">\n                    <input id=\"streamerMode\" type=\"checkbox\" checked> Streamer mode\n                </label>\n                <label class=\"row footer-toggle\">\n                    <input id=\"autoScroll\" type=\"checkbox\" checked> Auto scroll\n                </label>\n                <div class=\"resize-handle\"></div>\n            </div>\n        </div>\n    </div>\n</div>\n";
+  __exports.default = "<div id=\"undiscord\" class=\"browser container\" style=\"display:none;\">\n    <div class=\"header\">\n        <svg class=\"icon\" aria-hidden=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\">\n            <path fill=\"currentColor\" d=\"M15 3.999V2H9V3.999H3V5.999H21V3.999H15Z\"></path>\n            <path fill=\"currentColor\"\n                d=\"M5 6.99902V18.999C5 20.101 5.897 20.999 7 20.999H17C18.103 20.999 19 20.101 19 18.999V6.99902H5ZM11 17H9V11H11V17ZM15 17H13V11H15V17Z\">\n            </path>\n        </svg>\n        <h3>Undiscord Lite</h3>\n        <div class=\"vert-divider\"></div>\n        <span> Bulk delete messages</span>\n        <div class=\"spacer\"></div>\n        <div id=\"hide\" class=\"icon\" aria-label=\"Minimize\" role=\"button\" tabindex=\"0\" title=\"Minimize (run continues in background)\">\n            <svg aria-hidden=\"false\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\">\n                <path fill=\"currentColor\" d=\"M5 18h14v3H5z\"></path>\n            </svg>\n        </div>\n    </div>\n    <div class=\"window-body\" style=\"display: flex; flex-direction: row;\">\n        <div class=\"sidebar scroll\">\n            <div id=\"sidebarActions\">\n                <button id=\"start\" class=\"danger\" title=\"Start the deletion process\">▶︎ Delete</button>\n                <button id=\"verify\" class=\"verify-mode\" title=\"Print the current run configuration to the log so you can sanity-check it before clicking Delete.\">📋 Verify</button>\n                <button id=\"clear\" title=\"Clear the log area\">🗑️ Clear Log</button>\n            </div>\n            <div id=\"sidebarSelectionRow\">\n                <button id=\"resetSelection\" class=\"reset-selection\" title=\"Reset every input field in the sidebar to its default value (does not clear the log or any queued batches).\">↺ Reset Selection</button>\n                <button id=\"queueSelection\" class=\"queue-selection\" title=\"Snapshot the current selection as a queued batch, then reset the form. Click ▶︎ Delete to run all queued batches sequentially. Pre-flight runs at queue time when non-self authors are present.\">Batch Selection +</button>\n            </div>\n            <div id=\"sidebarBadgeRow\">\n                <span id=\"importBadge\" class=\"import-badge\" style=\"display:none;\" title=\"An imported export is loaded. The General queue, Search filter, and Delete filter sections are ignored — only Date and Messages interval still apply.\">import mode</span>\n                <button id=\"dropBatches\" class=\"drop-batches\" style=\"display:none;\" title=\"Discard every queued batch. Does not affect the current form.\">drop batches</button>\n                <span id=\"queueBadge\" class=\"queue-badge\" style=\"display:none;\" title=\"Number of selection snapshots queued. Click ▶︎ Delete to run them sequentially.\">queued: 0</span>\n            </div>\n            <hr>\n            <details id=\"sectionGeneral\" open>\n                <summary>General<button class=\"help-btn\" data-help=\"tabGeneral\" title=\"Show help for the General tab\">Help</button></summary>\n                <fieldset>\n                    <legend>Author ID</legend>\n                    <button class=\"help-btn\" data-help=\"authorId\" title=\"Show help for Author ID\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"input clearable\" id=\"authorId\" type=\"text\" placeholder=\"Author ID(s)\">\n                        <button class=\"clear-btn\" id=\"clearAuthor\" title=\"Clear Author ID\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"getAuthor\">Me</button>\n                        <button id=\"selectAuthor\" title=\"Click, then click a user or message in Discord to capture their User ID. Hold Shift to capture multiple in a row.\">Select</button>\n                    </div>\n                    <div class=\"sectionDescription\" style=\"margin-top: 6px;\">\n                        <label class=\"row\" style=\"margin-bottom: 0;\" title=\"When checked, age-gated NSFW channels are excluded from Discord's search results. Default: off (NSFW channels are included).\">\n                            <input id=\"excludeNsfw\" type=\"checkbox\">\n                            Exclude NSFW channels\n                        </label>\n                    </div>\n                </fieldset>\n                <hr>\n                <fieldset>\n                    <legend>Server ID</legend>\n                    <button class=\"help-btn\" data-help=\"serverId\" title=\"Show help for Server ID\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"input clearable\" id=\"guildId\" type=\"text\" placeholder=\"Server ID(s)\">\n                        <button class=\"clear-btn\" id=\"clearGuild\" title=\"Clear Server (also clears Channel)\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"addGuild\" title=\"Queue the server you're currently viewing for a server-wide wipe.\">Add</button>\n                        <button id=\"delGuild\" title=\"Remove the server you're currently viewing from the queue.\">Delete</button>\n                        <button id=\"selectGuild\" title=\"Click, then click a server icon in Discord to capture its ID\">Select</button>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Channel ID</legend>\n                    <button class=\"help-btn\" data-help=\"channelId\" title=\"Show help for Channel ID\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"input clearable\" id=\"channelId\" type=\"text\" placeholder=\"Channel ID(s)\">\n                        <button class=\"clear-btn\" id=\"clearChannel\" title=\"Clear Channel only\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"addChannel\" title=\"Queue the channel you're currently viewing.\">Add</button>\n                        <button id=\"delChannel\" title=\"Remove the channel you're currently viewing from the queue.\">Delete</button>\n                        <button id=\"selectChannel\" title=\"Click, then click a channel or message in Discord to capture its ID\">Select</button>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend style=\"text-transform: none;\">DMs</legend>\n                    <button class=\"help-btn\" data-help=\"dms\" title=\"Show help for DMs\">Help</button>\n                    <div class=\"input-actions\">\n                        <button id=\"addAllDms\" title=\"Queue every DM channel currently open in your sidebar\">Add DMs</button>\n                        <button id=\"delAllDms\" title=\"Remove every queued DM channel from the queue\">Clear DMs</button>\n                    </div>\n                    <div class=\"sectionDescription\" style=\"margin-top: 3px;\">\n                        <label class=\"row\" style=\"margin-bottom: 0;\" title=\"When checked, group DMs are excluded from the bulk Add DMs action. Default: off (group DMs are included).\">\n                            <input id=\"excludeGroupDms\" type=\"checkbox\">\n                            Exclude group DMs\n                        </label>\n                    </div>\n                </fieldset>\n            </details>\n            <hr>\n            <details id=\"sectionImport\">\n                <summary>Import data export<button class=\"help-btn\" data-help=\"importExport\" title=\"Show help for Import data export\">Help</button></summary>\n                <fieldset>\n                    <legend>Import folder</legend>\n                    <button class=\"help-btn\" data-help=\"importFolder\" title=\"Show help for picking the import folder\">Help</button>\n                    <input id=\"importPicker\" type=\"file\" webkitdirectory directory multiple style=\"display:none;\">\n                    <div class=\"input-actions\">\n                        <button id=\"importPick\" title=\"Pick the unzipped 'messages/' folder of your Discord data export\">Select Folder...</button>\n                        <button id=\"importClear\" title=\"Clear the loaded import and return to live-search mode\">Clear Import</button>\n                    </div>\n                    <div id=\"importSummary\" class=\"sectionDescription\" style=\"margin-top: 6px;\">No import loaded.</div>\n                    <div class=\"pill-group-label\">Exclude all</div>\n                    <div class=\"import-type-pills\">\n                        <label class=\"pill\" title=\"Drop every guild (server) message during deletion-queue construction. Default: off.\">\n                            <input id=\"importExcludeAllServers\" type=\"checkbox\">\n                            Exclude servers\n                        </label>\n                        <label class=\"pill\" title=\"Drop every 1:1 DM during deletion-queue construction. Default: off.\">\n                            <input id=\"importExcludeAllDms\" type=\"checkbox\">\n                            Exclude DMs\n                        </label>\n                        <label class=\"pill\" title=\"Drop every group DM (multi-recipient channel under @me) during deletion-queue construction. Default: off.\">\n                            <input id=\"importExcludeAllChannels\" type=\"checkbox\">\n                            Exclude group DMs\n                        </label>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Exclude Server</legend>\n                    <button class=\"help-btn\" data-help=\"importExcludeServer\" title=\"Show help for Exclude Server\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"importExcludeServers\" type=\"text\" placeholder=\"Server ID(s) to skip\">\n                        <button class=\"clear-btn\" id=\"clearImportExcludeServers\" title=\"Clear excluded servers\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"addImportExcludeServers\" title=\"Add the server you're currently viewing to the exclusion list. @me is allowed (skips every DM).\">Add</button>\n                        <button id=\"delImportExcludeServers\" title=\"Remove the server you're currently viewing from the exclusion list.\">Delete</button>\n                        <button id=\"selectImportExcludeServers\" title=\"Click, then click a server icon in Discord to capture its ID. Hold Shift to capture several in a row.\">Select</button>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Exclude Channel</legend>\n                    <button class=\"help-btn\" data-help=\"importExcludeChannel\" title=\"Show help for Exclude Channel\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"importExcludeChannels\" type=\"text\" placeholder=\"Channel ID(s) to skip\">\n                        <button class=\"clear-btn\" id=\"clearImportExcludeChannels\" title=\"Clear excluded channels\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"addImportExcludeChannels\" title=\"Add the channel you're currently viewing to the exclusion list.\">Add</button>\n                        <button id=\"delImportExcludeChannels\" title=\"Remove the channel you're currently viewing from the exclusion list.\">Delete</button>\n                        <button id=\"selectImportExcludeChannels\" title=\"Click, then click a channel or any message inside one to capture the channel ID. Hold Shift to capture several in a row.\">Select</button>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Exclude DM with User</legend>\n                    <button class=\"help-btn\" data-help=\"importExcludeUser\" title=\"Show help for Exclude DM with User\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"importExcludeUsers\" type=\"text\" placeholder=\"User ID(s) to skip\">\n                        <button class=\"clear-btn\" id=\"clearImportExcludeUsers\" title=\"Clear excluded users\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"selectImportExcludeUsers\" title=\"Click, then click an avatar/username in Discord to capture the user ID. Hold Shift to capture several in a row.\">Select</button>\n                    </div>\n                </fieldset>\n            </details>\n            <hr>\n            <details id=\"sectionSearchFilter\">\n                <summary>Search filter<button class=\"help-btn\" data-help=\"tabSearchFilter\" title=\"Show help for the Search filter tab\">Help</button></summary>\n                <fieldset>\n                    <legend>Include text</legend>\n                    <button class=\"help-btn\" data-help=\"includeText\" title=\"Show help for Include text\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"search\" type=\"text\" placeholder=\"Containing text\">\n                        <button class=\"clear-btn\" id=\"clearSearch\" title=\"Clear Include text\">Clear</button>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Include attachment type</legend>\n                    <button class=\"help-btn\" data-help=\"includeAttachment\" title=\"Show help for Include attachment type\">Help</button>\n                    <div class=\"has-grid\">\n                        <label><input id=\"hasLink\"    type=\"checkbox\">Link</label>\n                        <label><input id=\"hasImage\"   type=\"checkbox\">Image</label>\n                        <label><input id=\"hasVideo\"   type=\"checkbox\">Video</label>\n                        <label><input id=\"hasSound\"   type=\"checkbox\">Sound</label>\n                        <label><input id=\"hasSticker\" type=\"checkbox\">Sticker</label>\n                        <label><input id=\"hasPoll\"    type=\"checkbox\">Poll</label>\n                        <label><input id=\"hasEmbed\"   type=\"checkbox\">Embed</label>\n                        <label><input id=\"hasForward\" type=\"checkbox\">Forward</label>\n                    </div>\n                    <div class=\"sectionDescription\" style=\"margin-top: 8px;\">\n                        <label class=\"row\" style=\"margin-bottom: 0;\">Pinned:&nbsp;\n                            <select id=\"pinnedMode\">\n                                <option value=\"exclude\" selected>exclude</option>\n                                <option value=\"include\">include</option>\n                                <option value=\"only\">only pinned</option>\n                            </select>\n                        </label>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Include @user</legend>\n                    <button class=\"help-btn\" data-help=\"includeUser\" title=\"Show help for Include @user\">Help</button>\n                    <div class=\"sectionDescription\">\n                        <label><input id=\"mentionEveryone\" type=\"checkbox\">Include @everyone / @here</label>\n                    </div>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"mentionsId\" type=\"text\" placeholder=\"Mentions user ID\">\n                        <button class=\"clear-btn\" id=\"clearMentions\" title=\"Clear Mentions user IDs\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"selectMentions\" title=\"Click, then click a user or message in Discord to capture their User ID\">Select</button>\n                    </div>\n                </fieldset>\n            </details>\n            <hr>\n            <details id=\"sectionDeleteFilter\">\n                <summary>Delete filter<button class=\"help-btn\" data-help=\"tabDeleteFilter\" title=\"Show help for the Delete filter tab\">Help</button></summary>\n                <fieldset>\n                    <legend>Skip text</legend>\n                    <button class=\"help-btn\" data-help=\"excludeText\" title=\"Show help for Skip text\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"excludeSearch\" type=\"text\" placeholder=\"Skip messages containing\">\n                        <button class=\"clear-btn\" id=\"clearExcludeSearch\" title=\"Clear Skip text\">Clear</button>\n                    </div>\n                    <div class=\"sectionDescription\" style=\"margin-top: 6px;\">\n                        <label class=\"row\" style=\"margin-bottom: 0;\" title=\"Substring: term appears anywhere in the message. Exact: term must appear as a standalone word.\">Match:&nbsp;\n                            <select id=\"excludeMatchMode\">\n                                <option value=\"substring\" selected>substring</option>\n                                <option value=\"exact\">exact</option>\n                            </select>\n                        </label>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Skip attachment type</legend>\n                    <button class=\"help-btn\" data-help=\"excludeAttachment\" title=\"Show help for Skip attachment type\">Help</button>\n                    <div class=\"has-grid\">\n                        <label><input id=\"excludeLink\"    type=\"checkbox\">Link</label>\n                        <label><input id=\"excludeImage\"   type=\"checkbox\">Image</label>\n                        <label><input id=\"excludeVideo\"   type=\"checkbox\">Video</label>\n                        <label><input id=\"excludeSound\"   type=\"checkbox\">Sound</label>\n                        <label class=\"import-noop\" title=\"Stickers aren't carried in the Discord data export — this toggle has no effect in import mode.\"><input id=\"excludeSticker\" type=\"checkbox\">Sticker</label>\n                        <label class=\"import-noop\" title=\"Polls aren't carried in the Discord data export — this toggle has no effect in import mode.\"><input id=\"excludePoll\"    type=\"checkbox\">Poll</label>\n                        <label class=\"import-noop\" title=\"Embeds aren't carried in the Discord data export — this toggle has no effect in import mode.\"><input id=\"excludeEmbed\"   type=\"checkbox\">Embed</label>\n                        <label class=\"import-noop\" title=\"Forward metadata isn't carried in the Discord data export — this toggle has no effect in import mode.\"><input id=\"excludeForward\" type=\"checkbox\">Forward</label>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Skip extension</legend>\n                    <button class=\"help-btn\" data-help=\"excludeExtension\" title=\"Show help for Skip extension\">Help</button>\n                    <div class=\"has-grid\">\n                        <label><input type=\"checkbox\" data-ext=\"jpg\">.jpg</label>\n                        <label><input type=\"checkbox\" data-ext=\"png\">.png</label>\n                        <label><input type=\"checkbox\" data-ext=\"mp4\">.mp4</label>\n                        <label><input type=\"checkbox\" data-ext=\"webm\">.webm</label>\n                        <label><input type=\"checkbox\" data-ext=\"pdf\">.pdf</label>\n                        <label><input type=\"checkbox\" data-ext=\"docx\">.docx</label>\n                        <label><input type=\"checkbox\" data-ext=\"txt\">.txt</label>\n                        <label><input type=\"checkbox\" data-ext=\"zip\">.zip</label>\n                    </div>\n                    <div class=\"input-wrapper\" style=\"margin-top: 8px;\">\n                        <input class=\"clearable\" id=\"excludeExtensions\" type=\"text\" placeholder=\"Custom: .ext1;.ext2;.ext3\">\n                        <button class=\"clear-btn\" id=\"clearExcludeExtensions\" title=\"Clear custom extensions\">Clear</button>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Skip @user</legend>\n                    <button class=\"help-btn\" data-help=\"excludeUser\" title=\"Show help for Skip @user\">Help</button>\n                    <div class=\"sectionDescription\">\n                        <label><input id=\"excludeMentionEveryone\" type=\"checkbox\">skip @everyone / @here</label>\n                    </div>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"excludeMentionsId\" type=\"text\" placeholder=\"User ID(s) to skip\">\n                        <button class=\"clear-btn\" id=\"clearExcludeMentions\" title=\"Clear Skip mentions user IDs\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"selectExcludeMentions\" title=\"Click, then click a user or message in Discord to capture their User ID\">Select</button>\n                    </div>\n                </fieldset>\n            </details>\n            <hr>\n            <details>\n                <summary>Messages interval<button class=\"help-btn\" data-help=\"tabMessagesInterval\" title=\"Show help for the Messages interval tab\">Help</button></summary>\n                <fieldset>\n                    <legend>Interval of messages</legend>\n                    <button class=\"help-btn\" data-help=\"messagesInterval\" title=\"Show help for Messages interval\">Help</button>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"minId\" type=\"text\" placeholder=\"After message ID\">\n                        <button class=\"clear-btn\" id=\"clearMinId\" title=\"Clear After message ID\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\" style=\"margin-bottom: 5px;\">\n                        <button id=\"selectMinId\" title=\"Click, then click a message in Discord to capture its ID as the After bound\">Select</button>\n                    </div>\n                    <div class=\"input-wrapper\">\n                        <input class=\"clearable\" id=\"maxId\" type=\"text\" placeholder=\"Before message ID\">\n                        <button class=\"clear-btn\" id=\"clearMaxId\" title=\"Clear Before message ID\">Clear</button>\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"selectMaxId\" title=\"Click, then click a message in Discord to capture its ID as the Before bound\">Select</button>\n                    </div>\n                </fieldset>\n            </details>\n            <hr>\n            <details>\n                <summary>Date interval<button class=\"help-btn\" data-help=\"tabDateInterval\" title=\"Show help for the Date interval tab\">Help</button></summary>\n                <fieldset>\n                    <legend>After date</legend>\n                    <button class=\"help-btn\" data-help=\"dateInterval\" title=\"Show help for Date interval\">Help</button>\n                    <div class=\"input-wrapper mb1\">\n                        <input id=\"minDate\" type=\"datetime-local\" value=\"2015-01-01T00:00\" title=\"Messages posted AFTER this date (defaults to Discord's launch — clear or change as needed)\">\n                    </div>\n                    <legend>Before date</legend>\n                    <div class=\"input-wrapper\">\n                        <input id=\"maxDate\" type=\"datetime-local\" title=\"Messages posted BEFORE this date\">\n                    </div>\n                    <div class=\"input-actions\">\n                        <button id=\"datePresetDay\"  class=\"date-preset-day\"  title=\"Now − 24 hours\">1 Day</button>\n                        <button id=\"datePresetWeek\" class=\"date-preset-week\" title=\"Now − 7 days\">1 Week</button>\n                        <button id=\"datePresetAll\"  class=\"date-preset-all\"  title=\"Reset After to 2015 and clear Before\">All</button>\n                    </div>\n                </fieldset>\n            </details>\n            <hr>\n            <details>\n                <summary>Delay settings<button class=\"help-btn\" data-help=\"tabAdvanced\" title=\"Show help for the Delay settings section\">Help</button></summary>\n                <fieldset>\n                    <legend>Search delay (ms)</legend>\n                    <button class=\"help-btn\" data-help=\"searchDelay\" title=\"Show help for Search delay\">Help</button>\n                    <div class=\"stepper\">\n                        <input id=\"searchDelay\" type=\"text\" title=\"Click to type a value (auto-clamps to 15000–60000 ms)\">\n                        <button id=\"searchDelayDown\" class=\"stepper-down\" title=\"−500 ms\">&lt;</button>\n                        <button id=\"searchDelayUp\" class=\"stepper-up\" title=\"+500 ms\">&gt;</button>\n                        <button id=\"searchDelayReset\" class=\"stepper-reset\" title=\"Reset to default\">↺</button>\n                    </div>\n                </fieldset>\n                <fieldset>\n                    <legend>Delete delay (ms)</legend>\n                    <button class=\"help-btn\" data-help=\"deleteDelay\" title=\"Show help for Delete delay\">Help</button>\n                    <div class=\"stepper\">\n                        <input id=\"deleteDelay\" type=\"text\" title=\"Click to type a value (auto-clamps to 100–3000 ms)\">\n                        <button id=\"deleteDelayDown\" class=\"stepper-down\" title=\"−50 ms\">&lt;</button>\n                        <button id=\"deleteDelayUp\" class=\"stepper-up\" title=\"+50 ms\">&gt;</button>\n                        <button id=\"deleteDelayReset\" class=\"stepper-reset\" title=\"Reset to default\">↺</button>\n                    </div>\n                </fieldset>\n            </details>\n        </div>\n        <div class=\"main col\">\n            <div class=\"tbar col\" id=\"topBar\">\n                <div class=\"row\" id=\"topBarSlot\">\n                    <!-- Run-status text — populated by renderTopBar() (idle) or onProgress (running). -->\n                </div>\n                <div class=\"row\">\n                    <progress id=\"progressBar\" style=\"display:none;\"></progress>\n                </div>\n            </div>\n            <pre id=\"logArea\" class=\"logarea scroll\"></pre>\n            <div class=\"tbar footer row\">\n                <div id=\"footerTime\"></div>\n                <span class=\"spacer\"></span>\n                <label class=\"row footer-toggle\" title=\"Redact message content AND usernames in the log + confirmation preview\">\n                    <input id=\"streamerMode\" type=\"checkbox\" checked> Streamer mode\n                </label>\n                <label class=\"row footer-toggle\">\n                    <input id=\"autoScroll\" type=\"checkbox\" checked> Auto scroll\n                </label>\n                <div class=\"resize-handle\"></div>\n            </div>\n        </div>\n    </div>\n</div>\n";
 };
 
 __modules["src/helpers.js"] = (__exports) => {
@@ -78,6 +78,11 @@ __modules["src/helpers.js"] = (__exports) => {
   
   /** HTML-escapes a value (& < " ') for safe injection into innerHTML. */
   const escapeHTML = html => String(html).replace(/[&<"']/g, m => ({ '&': '&amp;', '<': '&lt;', '"': '&quot;', '\'': '&#039;' })[m]);
+  
+  /** Emits the `.sm-real / .sm-redacted` dual-span used by streamer-mode log redaction. CSS at panel scope shows exactly one of the two spans depending on whether `.streamer-on` is set, so toggling streamer mode instantly re-renders every already-printed log line. The real value is HTML-escaped; the placeholder defaults to '••••' (callers pass e.g. '[ATTACHMENTS]' for non-ID redactions). */
+  function redactHtml(real, placeholder = '••••') {
+    return `<span class="sm-real">${escapeHTML(String(real))}</span><span class="sm-redacted">${escapeHTML(placeholder)}</span>`;
+  }
   
   /** Joins a `[[key, value], ...]` array into a URL query string, skipping pairs whose value is undefined. Values are URL-encoded. */
   const queryString = params => params.filter(p => p[1] !== undefined).map(p => p[0] + '=' + encodeURIComponent(p[1])).join('&');
@@ -213,6 +218,7 @@ __modules["src/helpers.js"] = (__exports) => {
   __exports.parseCsvList = parseCsvList;
   __exports.buildContentMatcher = buildContentMatcher;
   __exports.buildExtensionMatcher = buildExtensionMatcher;
+  __exports.redactHtml = redactHtml;
   __exports.createElm = createElm;
   __exports.insertCss = insertCss;
   __exports.getToken = getToken;
@@ -232,7 +238,7 @@ __modules["src/undiscord-core.js"] = (__exports) => {
   // `runBatch(queue)` (multiple). Pulls pages from Discord's search API, or
   // from an in-memory ImportSource when one is supplied.
   // ============================================================================
-  const { log, msToHMS, escapeHTML, queryString, askYesNo, toSnowflake, parseCsvList, buildContentMatcher, buildExtensionMatcher } = __require("src/helpers.js");
+  const { log, msToHMS, escapeHTML, redactHtml, queryString, askYesNo, toSnowflake, parseCsvList, buildContentMatcher, buildExtensionMatcher } = __require("src/helpers.js");
   const API_BASE = 'https://discord.com/api/v9';
   const MAX_DELETE_ATTEMPTS = 2;     // Per-message retry on transient failures.
   const MAX_TRANSIENT_RETRIES = 3;   // Search-side retries for 5xx and network errors.
@@ -928,14 +934,21 @@ __modules["src/undiscord-core.js"] = (__exports) => {
   
         const message = this.state._messagesToDelete[i];
   
-        const sm = this.options.streamerMode;
-        const author = sm ? '••••' : `${message.author?.username ?? '[system]'}#${message.author?.discriminator ?? '0'}`;
+        // Streamer-mode redaction lives in the DOM via redactHtml dual-spans;
+        // CSS toggles which side is visible. Decoupling redaction from the run-
+        // time `streamerMode` option means flipping the checkbox mid-run
+        // immediately redacts every already-printed line.
+        const author = `${message.author?.username ?? '[system]'}#${message.author?.discriminator ?? '0'}`;
+        const content = (message.content ?? '').replace(/\n/g, '↵');
+        const attachments = message.attachments?.length
+          ? ' ' + redactHtml(JSON.stringify(message.attachments), '[ATTACHMENTS]')
+          : '';
         log.debug(
           `[${this.state.delCount + 1}/${this.state.grandTotal}] ` +
           `<sup>${new Date(message.timestamp).toLocaleString()}</sup> ` +
-          `<b>${escapeHTML(author)}</b>` +
-          `: <i>${escapeHTML(sm ? '••••' : (message.content ?? '')).replace(/\n/g, '↵')}</i>` +
-          (message.attachments?.length ? (sm ? ' [ATTACHMENTS]' : escapeHTML(JSON.stringify(message.attachments))) : ''),
+          `<b>${redactHtml(author)}</b>` +
+          `: <i>${redactHtml(content)}</i>` +
+          attachments,
           `<sup>{ID:${escapeHTML(message.id)}}</sup>`
         );
   
@@ -1516,10 +1529,12 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
   // ============================================================================
   // UNDISCORD-LITE — UI LAYER
   // ----------------------------------------------------------------------------
-  // Owns the panel HTML, CSS, every event binding, and the two run orchestrators
-  // (search-mode startAction / import-mode startImportAction). All Discord page
-  // I/O — token, URL parsing, server-bar injection, point-and-click ID capture —
-  // happens here. The delete pipeline itself lives in undiscord-core.js.
+  // Owns the panel HTML, CSS, every event binding, and the run orchestrators —
+  // the meta-orchestrator startAction(), per-snapshot dispatchers
+  // runSearchModeFromForm / runImportModeFromForm, and the Batch Selection
+  // queue flow. All Discord page I/O — token, URL parsing, server-bar injection,
+  // point-and-click ID capture — happens here. The delete pipeline itself
+  // lives in undiscord-core.js.
   // ============================================================================
   
   const LOG_PREFIX = '[UNDISCORD-LITE]';
@@ -1527,7 +1542,7 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
   const undiscordTemplate = __require("src/ui/undiscord.html").default;const UndiscordCore = __require("src/undiscord-core.js").default;
   const Drag = __require("src/ui/drag.js").default;
   const { parseExport, summarizeImport, ImportSource } = __require("src/export-import.js");
-  const { createElm, insertCss, log, setLogFn, msToHMS, getAuthorId, getGuildId, getChannelId, fillToken, snowflakeToMs, parseCsvList, buildContentMatcher, buildExtensionMatcher } = __require("src/helpers.js");
+  const { createElm, insertCss, log, setLogFn, msToHMS, redactHtml, getAuthorId, getGuildId, getChannelId, fillToken, snowflakeToMs, parseCsvList, buildContentMatcher, buildExtensionMatcher } = __require("src/helpers.js");
   // ============================================================================
   // MODULE STATE
   // ----------------------------------------------------------------------------
@@ -1560,8 +1575,9 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
   
   // Loaded Discord data export (post-parse). Null when no import is active.
   // Shape: { messages, channelCount, oldestTs, newestTs } as returned by parseExport().
-  // When set, startAction() routes through startImportAction() and the General /
-  // Search filter / Delete filter UI sections grey out (CSS via .import-mode).
+  // When set, startAction() routes the per-snapshot dispatch through
+  // runImportModeFromForm() and the General / Search filter / Delete filter UI
+  // sections grey out (CSS via .import-mode).
   let importedSet = null;
   
   // One-shot log message printed right after the "Started at..." line. Used by
@@ -1574,12 +1590,11 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
   // onJob) display "Job 1/1" in the top bar instead of leftover values.
   let currentJobInfo = { i: 1, n: 1 };
   
-  /** Streamer-mode redaction. Returns '••••' when the Streamer mode toggle is on, the value as-is otherwise. '@me' passes through verbatim — it's a literal Discord URL token, not a sensitive ID, and the queue-management logs read clearer with it intact. Empty / null inputs pass through so callers don't have to null-guard. */
+  /** Streamer-mode redaction. Emits a `redactHtml` dual-span so log lines render either the real value or '••••' depending on the panel's `.streamer-on` class — CSS-toggled, so already-printed log lines re-render the moment the streamer-mode checkbox flips. '@me' passes through verbatim (literal Discord URL token, not a sensitive ID). Empty / null inputs pass through so callers don't have to null-guard. */
   function dot(v) {
     if (v == null || v === '') return v;
-    if (!$('input#streamerMode')?.checked) return v;
     if (v === '@me') return '@me';
-    return '••••';
+    return redactHtml(v);
   }
   
   
@@ -1595,10 +1610,12 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
   // inputs to grouped format on the next click.
   // ============================================================================
   
-  /** Parses the Server / Channel inputs into a flat `[{guildId, channelId}, ...]` target list. Channel entries with no parent server (orphans) are counted but not included in the list. */
-  function parseTargets() {
-    const guildRaw = $('input#guildId').value.trim();
-    const channelRaw = $('input#channelId').value.trim();
+  /** Parses the Server / Channel inputs into a flat `[{guildId, channelId}, ...]` target list. Channel entries with no parent server (orphans) are counted but not included in the list. Defaults to reading the live form fields; callers can pass raw strings instead (used by the redundancy check to parse snapshot targets without touching the DOM). */
+  function parseTargets(guildRaw, channelRaw) {
+    if (guildRaw   === undefined) guildRaw   = $('input#guildId').value;
+    if (channelRaw === undefined) channelRaw = $('input#channelId').value;
+    guildRaw   = guildRaw.trim();
+    channelRaw = channelRaw.trim();
     const servers = guildRaw ? guildRaw.split(/\s*,\s*/) : [];
   
     const targets = [];
@@ -2054,6 +2071,18 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
     };
     $('button#verify').onclick = verifyAction;
     $('button#clear').onclick = () => ui.logArea.innerHTML = '';
+    $('button#resetSelection').onclick = () => {
+      resetAllSelection();
+      log.info('Selection reset to defaults.');
+    };
+    $('button#queueSelection').onclick = queueSelectionAction;
+    $('button#dropBatches').onclick = () => {
+      if (selectionQueue.length === 0) return;
+      const n = selectionQueue.length;
+      selectionQueue = [];
+      renderQueueBadge();
+      log.info(`Dropped ${n} queued batch${n === 1 ? '' : 'es'}.`);
+    };
     $('button#getAuthor').onclick = () => {
       const id = getAuthorId();
       if (id) $('input#authorId').value = id;
@@ -2140,6 +2169,7 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
     $('input#guildId').addEventListener('change', cleanupOrphanedMe);
     $('input#channelId').addEventListener('change', cleanupOrphanedMe);
     renderQueue();
+    renderQueueBadge();
   
     // Import data export — folder picker, summary, clear button.
     bindImportControls();
@@ -2389,7 +2419,7 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
       name: 'Messages interval',
       lines: [
         "Bound the wipe to a snowflake range using two message IDs.",
-        "Right-click any message → <b>Copy Message Link</b>, paste into either field. The script auto-strips the URL down to just the ID.",
+        "Right-click any message → <b>Copy Message Link</b>, paste into either field. The script <b>auto-strips the URL</b> down to just the trailing message ID — no manual cleanup needed. Pasting a bare snowflake also works directly.",
         "<b>Messages interval overrides Date interval</b> if both are set.",
       ],
     },
@@ -2420,6 +2450,8 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
         "&nbsp;&nbsp;2. Right-click their profile icon &rarr; <b>Copy User ID</b>.",
         "&nbsp;&nbsp;3. Right-click a message &rarr; <b>Copy Message ID</b> (also useful for Messages interval).",
         "To chain multiple people, comma-separate the IDs: <code>id1,id2,id3</code>. The run expands to one job per (target × author).",
+        "<b>Auto-format on paste:</b> pasting one snowflake-shaped ID, or a comma-separated list of them, appends to the current value with deduplication — no need to manually edit the existing text. Pastes that aren't snowflake-shaped fall through to native paste so you can correct typos.",
+        "Click <b>Select</b> to enter point-and-click capture mode, then click any user / avatar / message author in Discord to capture their User ID — hold Shift to capture several in a row.",
         "Non-self authors require <i>Manage Messages</i> permission on their target server. A pre-flight check runs once at the top of the batch and aborts early if any pair lacks it.",
         "DMs are excluded from multi-author batching — Discord only lets you delete your own DM messages, so each DM target spawns one self-author job regardless of how many IDs are in the list.",
         "<b>Exclude NSFW channels</b> checkbox (default off): when checked, age-gated channels return zero results from Discord's search API. Default behavior is to include them.",
@@ -2478,6 +2510,7 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
       lines: [
         "Restrict the search to messages where this user is @mentioned.",
         "<b>Single user only</b> — Discord's search API can only filter by one mentioned user per request, so this field accepts exactly one ID. Pasting or capturing a new ID overwrites the current value.",
+        "<b>Auto-format on paste:</b> pasting a snowflake-shaped ID overwrites the field directly. Non-snowflake clipboards fall through to native paste so you can edit freely.",
         "If you need to match several mentioned users, run separate passes (one per ID). The asymmetry only affects this side — see <b>Skip @user</b> for the multi-value variant.",
         "Toggle <b>has @everyone / @here</b> to also include messages that pinged everyone or online users.",
         "Right-click a user &rarr; <b>Copy User ID</b> (Developer Mode required), or use <b>Select</b> and click any avatar/username in the message list.",
@@ -2517,6 +2550,7 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
       lines: [
         "Skip messages where any of these users are @mentioned — they survive the run.",
         "<b>Multi-value</b> — comma-separate any number of user IDs, or paste/capture them one at a time and they'll append (with dedup). Every listed ID is checked against each message's mentions at filter time, so all of them work in a single pass — unlike <b>Include @user</b>, this side has no API limit because it's a client-side check after the search response.",
+        "<b>Auto-format on paste:</b> pasting a single snowflake-shaped ID, or a comma-separated list, appends to the current value with deduplication. Non-snowflake clipboards fall through to native paste.",
         "Toggle <b>skip @everyone / @here</b> to also skip messages that pinged everyone or online users.",
         "Right-click a user &rarr; <b>Copy User ID</b> (Developer Mode required), or use <b>Select</b> and click avatars/usernames; hold Shift to capture several in a row.",
         "An ID listed here cannot also be in <b>Include @user</b> — that combination would always match nothing.",
@@ -2526,7 +2560,8 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
       name: 'Messages interval',
       lines: [
         "Bound the search to messages between two specific message IDs (Discord snowflakes).",
-        "Right-click a message &rarr; <b>Copy Message Link</b>, then paste into either field — the script auto-strips the URL to just the trailing message ID.",
+        "<b>Auto-format on paste:</b> right-click a message &rarr; <b>Copy Message Link</b>, then paste into either field — the script auto-strips the URL down to just the trailing message ID. Pasting a bare snowflake also works directly. Non-link clipboards fall through to native paste.",
+        "Click <b>Select</b> next to either field to enter point-and-click capture mode, then click any message in Discord to capture its ID.",
         "<b>After ID</b> must be older (smaller snowflake) than <b>Before ID</b>.",
         "If only one bound is set, the other is unbounded (channel start or current time).",
         "<b>Messages interval overrides Date interval</b> if both are set.",
@@ -2591,8 +2626,10 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
       name: 'Import — Exclude Server',
       lines: [
         "Drop entire <b>servers</b> from the import before the delete loop runs. Comma-separate any number of Server IDs.",
-        "Click <b>Select</b> and then click a server icon in Discord to capture its ID — hold Shift to capture several in a row. Pasting one or more snowflake-shaped IDs appends with deduplication.",
+        "Click <b>Select</b> and then click a server icon in Discord to capture its ID — hold Shift to capture several in a row.",
+        "<b>Auto-format on paste:</b> pasting one snowflake-shaped ID, or a comma-separated list, appends to the current value with deduplication. Non-snowflake clipboards fall through to native paste.",
         "Matches against each message's <code>guildId</code> as recorded in <code>channel.json</code>. <b>Use <code>@me</code></b> to drop every DM and group DM in one go (they all carry <code>guildId=@me</code>).",
+        "For a wildcard \"drop every server\" pass, see the <b>Exclude servers</b> pill above the selector fields — the convenience equivalent of listing every server ID here.",
         "Servers in the export but not currently joined still match — the filter is purely client-side against the export data.",
       ],
     },
@@ -2601,7 +2638,9 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
       lines: [
         "Drop specific <b>channels</b> from the import. Comma-separate any number of channel IDs (works for guild channels, DMs, and group DMs alike — they all use the same snowflake format).",
         "Click <b>Select</b> and then click a channel in the sidebar (or any message inside one) to capture its ID — hold Shift to capture several in a row.",
+        "<b>Auto-format on paste:</b> pasting one snowflake-shaped ID, or a comma-separated list, appends with deduplication. Non-snowflake clipboards fall through to native paste.",
         "Matches against each message's <code>channelId</code>. Independent of <b>Exclude Server</b> — a channel listed here is dropped even if its parent server isn't excluded.",
+        "For a wildcard \"drop every group DM\" pass, see the <b>Exclude group DMs</b> pill above the selector fields.",
       ],
     },
     importExcludeUser: {
@@ -2609,7 +2648,9 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
       lines: [
         "Drop <b>DMs</b> and <b>group DMs</b> that include the listed user(s) as participants. Comma-separate any number of User IDs.",
         "Click <b>Select</b> and then click an avatar / username / message author in Discord to capture the User ID — hold Shift to capture several in a row.",
+        "<b>Auto-format on paste:</b> pasting one snowflake-shaped ID, or a comma-separated list, appends with deduplication. Non-snowflake clipboards fall through to native paste.",
         "Matches against the channel's <code>recipients</code> list (from <code>channel.json</code>). For group DMs, any single matched recipient drops the whole group.",
+        "For a wildcard \"drop every 1:1 DM\" pass, see the <b>Exclude DMs</b> pill above the selector fields.",
         "<b>Guild messages are unaffected by design</b> — every message in your own data export was sent <i>by</i> you, so there's no other-author dimension to filter on. Use <b>Exclude Channel</b> if you want to spare specific guild channels.",
       ],
     },
@@ -3165,6 +3206,21 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
   // bar, and writes the live progress text into the top-bar slot.
   // ============================================================================
   
+  // Per-second elapsed-time ticker. onProgress only fires after each delete
+  // completes, so elapsed time would freeze during the long search-delay waits
+  // between pages without it. lastRemainingMs caches the most recent ETR sample
+  // from onProgress so the ticker can rerender both halves of the footer.
+  let elapsedTicker = null;
+  let lastRemainingMs = 0;
+  
+  /** Refreshes the footer's elapsed/remaining readout. Called from the per-second ticker AND from onProgress (where lastRemainingMs is also refreshed from stats.etr). */
+  function renderFooterTime() {
+    if (!undiscordCore.stats.startTime) return;
+    const elapsed = msToHMS(Date.now() - undiscordCore.stats.startTime.getTime());
+    const remaining = msToHMS(lastRemainingMs);
+    ui.footerTime.textContent = `Elapsed ${elapsed} · Remaining ${remaining}`;
+  }
+  
   /** Registers core lifecycle hooks. Called once at the end of initUI(). */
   function bindCoreEvents() {
     undiscordCore.onStart = () => {
@@ -3175,6 +3231,15 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
       if (ui.serverBarBtn) ui.serverBarBtn.classList.add('running');
       ui.progressMain.style.display = 'block';
       ui.topBarSlot.innerHTML = `<span class="status-line status-running">Starting…</span>`;
+  
+      // 1 s cadence — keeps the digits moving even while the loop is sleeping
+      // through a search-delay wait. Remaining stays at its last onProgress
+      // sample (an estimate that only changes meaningfully on each delete).
+      lastRemainingMs = 0;
+      if (elapsedTicker) clearInterval(elapsedTicker);
+      elapsedTicker = setInterval(renderFooterTime, 1000);
+      renderFooterTime();
+  
       // Drain any one-shot notice startAction stashed (logged here so it lands
       // right after the "Started at..." line instead of getting wiped by the
       // log-clear that runs between startAction and run()).
@@ -3190,14 +3255,11 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
   
       if (max) {
         const percent = Math.round(value / max * 100) + '%';
-        const elapsed = msToHMS(Date.now() - stats.startTime.getTime());
-        const remaining = msToHMS(stats.etr);
         ui.topBarSlot.innerHTML =
           `<span class="status-line status-running">Deleting... ` +
           `| (${value}/${max}) ${percent} ` +
           `| Failures: ${state.failCount} ` +
           `| Job ${currentJobInfo.i}/${currentJobInfo.n} |</span>`;
-        ui.footerTime.textContent = `Elapsed ${elapsed} · Remaining ${remaining}`;
         ui.progressIcon.setAttribute('max', max);
         ui.progressMain.setAttribute('max', max);
         ui.progressIcon.value = value;
@@ -3214,6 +3276,11 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
         ui.progressMain.removeAttribute('value');
       }
   
+      // Cache the new ETR sample, then rerender the footer immediately so the
+      // user sees it without waiting for the next ticker beat.
+      lastRemainingMs = stats.etr;
+      renderFooterTime();
+  
       // Sync the stepper display to reflect any rate-limit bump/decay applied by core.
       setDelayDisplay('searchDelay', undiscordCore.options.searchDelay);
       setDelayDisplay('deleteDelay', undiscordCore.options.deleteDelay);
@@ -3229,9 +3296,314 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
       ui.undiscordBtn.classList.remove('running');
       if (ui.serverBarBtn) ui.serverBarBtn.classList.remove('running');
       ui.progressMain.style.display = 'none';
+      if (elapsedTicker) { clearInterval(elapsedTicker); elapsedTicker = null; }
       ui.footerTime.textContent = ''; // clear elapsed/remaining when idle
       renderTopBar();
     };
+  }
+  
+  
+  // ============================================================================
+  // SELECTION SNAPSHOT / RESET / BATCH QUEUE
+  // ----------------------------------------------------------------------------
+  // The Reset Selection and Batch Selection sidebar buttons let the user build
+  // a meta-batch — multiple independent selections, each with its own filters,
+  // target queue, and intervals, run sequentially when Delete is finally
+  // clicked. captureSnapshot reads every form input into a plain object;
+  // applySnapshot writes one back; resetAllSelection clears the form.
+  // selectionQueue holds queued snapshots; the current form is appended last
+  // in startAction so queue-then-delete runs queued batches first and the
+  // "live" form last.
+  //
+  // Two safeguards run at queue time:
+  //   - Pre-flight permission check (search-mode snapshots with non-self
+  //     authors) — failures reject the snapshot, not just the run later.
+  //   - Dedup + redundancy detection — exact-match snapshots are blocked
+  //     (snapshotKey); strictly-subsumed snapshots log a warning but queue
+  //     anyway (snapshotASubsumesB). Anything finer is the user's call.
+  // ============================================================================
+  
+  let selectionQueue = []; // array of snapshots; runs sequentially on next Delete
+  
+  // Identity tags for imported sets so dedup compares by reference, not by
+  // re-stringifying the (potentially huge) parsed export every time.
+  const importIdMap = new WeakMap();
+  let nextImportId = 1;
+  function importIdOf(set) {
+    if (!set) return null;
+    if (!importIdMap.has(set)) importIdMap.set(set, nextImportId++);
+    return importIdMap.get(set);
+  }
+  
+  /** Stable-stringifies a snapshot for dedup comparison. importedSet is replaced with an identity tag (so two snapshots referencing the same parsed export hash to the same key, regardless of its contents); every other field is captured by value via JSON.stringify (insertion-order-stable in V8/SpiderMonkey/JSC, and captureSnapshot always builds the object in the same field order). */
+  function snapshotKey(snap) {
+    return JSON.stringify({ ...snap, importedSet: importIdOf(snap.importedSet) });
+  }
+  
+  /** Returns true when every "narrowing" filter knob in `snap` is at its default state. Pinned-mode and NSFW are deliberately not checked — those interact with B's matching values in non-monotonic ways, so the caller compares them between A and B instead. */
+  function isFilterless(snap) {
+    // Search filter
+    if (snap.content) return false;
+    if (snap.hasLink || snap.hasImage || snap.hasVideo || snap.hasSound) return false;
+    if (snap.hasSticker || snap.hasPoll || snap.hasEmbed || snap.hasForward) return false;
+    if (snap.mentionsId) return false;
+    if (snap.mentionEveryone) return false;
+    // Skip (Delete) filter
+    if (snap.excludeSearch) return false;
+    if (snap.excludeLink || snap.excludeImage || snap.excludeVideo || snap.excludeSound) return false;
+    if (snap.excludeSticker || snap.excludePoll || snap.excludeEmbed || snap.excludeForward) return false;
+    if (snap.excludeMentionsId) return false;
+    if (snap.excludeMentionEveryone) return false;
+    if (snap.excludeExtensions) return false;
+    if (snap.excludeExtensionPills?.length) return false;
+    // Import-only exclusions
+    if (snap.importExcludeServers || snap.importExcludeChannels || snap.importExcludeUsers) return false;
+    if (snap.importExcludeAllServers || snap.importExcludeAllChannels || snap.importExcludeAllDms) return false;
+    return true;
+  }
+  
+  /** Returns the snapshot's effective {minMs, maxMs} interval. minId/maxId override minDate/maxDate (matching run-time precedence). The Discord-epoch default for minDate is treated as "no lower bound" so factory-default snapshots compare cleanly. */
+  function intervalOf(snap) {
+    let minMs = -Infinity, maxMs = Infinity;
+    if (snap.minId) minMs = snowflakeToMs(snap.minId);
+    else if (snap.minDate && snap.minDate !== DISCORD_EPOCH_LOCAL) minMs = new Date(snap.minDate).getTime();
+    if (snap.maxId) maxMs = snowflakeToMs(snap.maxId);
+    else if (snap.maxDate) maxMs = new Date(snap.maxDate).getTime();
+    return { minMs, maxMs };
+  }
+  
+  /** Returns the snapshot's author list as a Set. Empty Author ID resolves to a `__self__` sentinel — across snapshots the user is always the same identity, so two empty-author snapshots compare as authoring the same set without needing to actually look up the self ID. */
+  function authorSetOf(snap) {
+    const list = parseCsvList(snap.authorId);
+    return list.length ? new Set(list) : new Set(['__self__']);
+  }
+  
+  /** Returns true when every (server, channel) target in `bTargets` is covered by some target in `aTargets`. A server-wide entry in A (channelId === '') covers any (S, *) in B with the same server; a channel-specific entry only covers an exact match. */
+  function targetsCoverAll(aTargets, bTargets) {
+    for (const b of bTargets) {
+      let covered = false;
+      for (const a of aTargets) {
+        if (a.guildId !== b.guildId) continue;
+        if (a.channelId === '' || a.channelId === b.channelId) { covered = true; break; }
+      }
+      if (!covered) return false;
+    }
+    return true;
+  }
+  
+  /** Returns true when running snapshot `a` would delete every message snapshot `b` would, leaving `b` to do mostly-redundant work (404s on already-deleted messages). Both must share a mode (live-search vs same imported set), `a` must be filterless, and `a`'s scope/author/interval must be a superset of `b`'s. Pinned-mode and NSFW exclusion must align in live-search mode (import bypasses both). */
+  function snapshotASubsumesB(a, b) {
+    if (Boolean(a.importedSet) !== Boolean(b.importedSet)) return false;
+    if (a.importedSet && a.importedSet !== b.importedSet) return false;
+    if (!isFilterless(a)) return false;
+  
+    if (!a.importedSet) {
+      // Live-search-mode-only: pinned-mode and NSFW affect the deletion set in
+      // ways that aren't monotonic in the user's tunables — require an exact
+      // match on both rather than try to model the lattice.
+      if (a.pinnedMode  !== b.pinnedMode)  return false;
+      if (a.excludeNsfw !== b.excludeNsfw) return false;
+  
+      const aAuth = authorSetOf(a), bAuth = authorSetOf(b);
+      for (const id of bAuth) if (!aAuth.has(id)) return false;
+  
+      const { targets: aTargets } = parseTargets(a.guildId, a.channelId);
+      const { targets: bTargets } = parseTargets(b.guildId, b.channelId);
+      if (!targetsCoverAll(aTargets, bTargets)) return false;
+    }
+  
+    const aInt = intervalOf(a), bInt = intervalOf(b);
+    if (aInt.minMs > bInt.minMs) return false;
+    if (aInt.maxMs < bInt.maxMs) return false;
+  
+    return true;
+  }
+  
+  /** Refreshes the queue counter badge and the drop-batches button. Both hide entirely when the queue is empty so the badge row collapses to whatever else is there (just the import-mode chip, or nothing at all). */
+  function renderQueueBadge() {
+    const badge = $('#queueBadge');
+    const drop  = $('button#dropBatches');
+    if (!badge) return;
+    const n = selectionQueue.length;
+    if (n === 0) {
+      badge.style.display = 'none';
+      if (drop) drop.style.display = 'none';
+      return;
+    }
+    badge.style.display = 'inline-flex';
+    badge.textContent = `queued: ${n}`;
+    if (drop) drop.style.display = 'inline-flex';
+  }
+  
+  /** Snapshots every form input that affects a run into a plain object, ready to be replayed via applySnapshot. The `importedSet` reference is captured by identity (not deep copy) — only one import is loaded at a time, and the user clearing it shouldn't retroactively invalidate already-queued snapshots that were captured against it. */
+  function captureSnapshot() {
+    return {
+      // General
+      authorId:        $('input#authorId').value.trim(),
+      excludeNsfw:     $('input#excludeNsfw').checked,
+      guildId:         $('input#guildId').value,
+      channelId:       $('input#channelId').value,
+      excludeGroupDms: $('input#excludeGroupDms').checked,
+      // Search filter
+      content:          $('input#search').value.trim(),
+      hasLink:          $('input#hasLink').checked,
+      hasImage:         $('input#hasImage').checked,
+      hasVideo:         $('input#hasVideo').checked,
+      hasSound:         $('input#hasSound').checked,
+      hasSticker:       $('input#hasSticker').checked,
+      hasPoll:          $('input#hasPoll').checked,
+      hasEmbed:         $('input#hasEmbed').checked,
+      hasForward:       $('input#hasForward').checked,
+      mentionsId:       $('input#mentionsId').value.trim(),
+      mentionEveryone:  $('input#mentionEveryone').checked,
+      pinnedMode:       $('select#pinnedMode').value,
+      // Delete filter
+      excludeSearch:           $('input#excludeSearch').value.trim(),
+      excludeMatchMode:        $('select#excludeMatchMode').value,
+      excludeLink:             $('input#excludeLink').checked,
+      excludeImage:            $('input#excludeImage').checked,
+      excludeVideo:            $('input#excludeVideo').checked,
+      excludeSound:            $('input#excludeSound').checked,
+      excludeSticker:          $('input#excludeSticker').checked,
+      excludePoll:             $('input#excludePoll').checked,
+      excludeEmbed:            $('input#excludeEmbed').checked,
+      excludeForward:          $('input#excludeForward').checked,
+      excludeMentionsId:       $('input#excludeMentionsId').value.trim(),
+      excludeMentionEveryone:  $('input#excludeMentionEveryone').checked,
+      excludeExtensions:       $('input#excludeExtensions').value.trim(),
+      excludeExtensionPills:   Array.from(ui.undiscordWindow.querySelectorAll('input[data-ext]'))
+                                    .filter(el => el.checked)
+                                    .map(el => el.dataset.ext),
+      // Intervals
+      minId:    $('input#minId').value.trim(),
+      maxId:    $('input#maxId').value.trim(),
+      minDate:  $('input#minDate').value,
+      maxDate:  $('input#maxDate').value,
+      // Delays
+      searchDelay: getDelayMs('searchDelay'),
+      deleteDelay: getDelayMs('deleteDelay'),
+      // Import-mode exclusions (only meaningful when an import is loaded)
+      importedSet:                importedSet,
+      importExcludeServers:       $('input#importExcludeServers').value.trim(),
+      importExcludeChannels:      $('input#importExcludeChannels').value.trim(),
+      importExcludeUsers:         $('input#importExcludeUsers').value.trim(),
+      importExcludeAllServers:    $('input#importExcludeAllServers').checked,
+      importExcludeAllChannels:   $('input#importExcludeAllChannels').checked,
+      importExcludeAllDms:        $('input#importExcludeAllDms').checked,
+    };
+  }
+  
+  /** Writes a snapshot back into every form input — the inverse of captureSnapshot. Called once per snapshot during a meta-batch run, before the dispatch into core. The trailing renderQueue() refreshes the top-bar synopsis to match the freshly-applied target list. */
+  function applySnapshot(snap) {
+    $('input#authorId').value          = snap.authorId;
+    $('input#excludeNsfw').checked     = snap.excludeNsfw;
+    $('input#guildId').value           = snap.guildId;
+    $('input#channelId').value         = snap.channelId;
+    $('input#excludeGroupDms').checked = snap.excludeGroupDms;
+  
+    $('input#search').value           = snap.content;
+    $('input#hasLink').checked        = snap.hasLink;
+    $('input#hasImage').checked       = snap.hasImage;
+    $('input#hasVideo').checked       = snap.hasVideo;
+    $('input#hasSound').checked       = snap.hasSound;
+    $('input#hasSticker').checked     = snap.hasSticker;
+    $('input#hasPoll').checked        = snap.hasPoll;
+    $('input#hasEmbed').checked       = snap.hasEmbed;
+    $('input#hasForward').checked     = snap.hasForward;
+    $('input#mentionsId').value       = snap.mentionsId;
+    $('input#mentionEveryone').checked = snap.mentionEveryone;
+    $('select#pinnedMode').value      = snap.pinnedMode;
+  
+    $('input#excludeSearch').value           = snap.excludeSearch;
+    $('select#excludeMatchMode').value       = snap.excludeMatchMode;
+    $('input#excludeLink').checked           = snap.excludeLink;
+    $('input#excludeImage').checked          = snap.excludeImage;
+    $('input#excludeVideo').checked          = snap.excludeVideo;
+    $('input#excludeSound').checked          = snap.excludeSound;
+    $('input#excludeSticker').checked        = snap.excludeSticker;
+    $('input#excludePoll').checked           = snap.excludePoll;
+    $('input#excludeEmbed').checked          = snap.excludeEmbed;
+    $('input#excludeForward').checked        = snap.excludeForward;
+    $('input#excludeMentionsId').value       = snap.excludeMentionsId;
+    $('input#excludeMentionEveryone').checked = snap.excludeMentionEveryone;
+    $('input#excludeExtensions').value       = snap.excludeExtensions;
+    const pillSet = new Set(snap.excludeExtensionPills || []);
+    for (const el of ui.undiscordWindow.querySelectorAll('input[data-ext]')) {
+      el.checked = pillSet.has(el.dataset.ext);
+    }
+  
+    $('input#minId').value   = snap.minId;
+    $('input#maxId').value   = snap.maxId;
+    $('input#minDate').value = snap.minDate;
+    $('input#maxDate').value = snap.maxDate;
+  
+    setDelayDisplay('searchDelay', snap.searchDelay);
+    setDelayDisplay('deleteDelay', snap.deleteDelay);
+  
+    $('input#importExcludeServers').value         = snap.importExcludeServers;
+    $('input#importExcludeChannels').value        = snap.importExcludeChannels;
+    $('input#importExcludeUsers').value           = snap.importExcludeUsers;
+    $('input#importExcludeAllServers').checked    = snap.importExcludeAllServers;
+    $('input#importExcludeAllChannels').checked   = snap.importExcludeAllChannels;
+    $('input#importExcludeAllDms').checked        = snap.importExcludeAllDms;
+  
+    renderQueue();
+  }
+  
+  /** Resets every form input to its default. Wired to the Reset Selection sidebar button, and called after a successful Batch Selection so the form is empty for the next snapshot. Streamer mode and Auto scroll (footer toggles) are NOT touched — those are global UI preferences, not per-batch. The log area is also untouched (use Clear Log for that). */
+  function resetAllSelection() {
+    $('input#authorId').value      = '';
+    $('input#excludeNsfw').checked = false;
+    $('input#guildId').value       = '';
+    $('input#channelId').value     = '';
+    $('input#excludeGroupDms').checked = false;
+  
+    $('input#search').value           = '';
+    $('input#hasLink').checked        = false;
+    $('input#hasImage').checked       = false;
+    $('input#hasVideo').checked       = false;
+    $('input#hasSound').checked       = false;
+    $('input#hasSticker').checked     = false;
+    $('input#hasPoll').checked        = false;
+    $('input#hasEmbed').checked       = false;
+    $('input#hasForward').checked     = false;
+    $('input#mentionsId').value       = '';
+    $('input#mentionEveryone').checked = false;
+    $('select#pinnedMode').value      = 'exclude';
+  
+    $('input#excludeSearch').value           = '';
+    $('select#excludeMatchMode').value       = 'substring';
+    $('input#excludeLink').checked           = false;
+    $('input#excludeImage').checked          = false;
+    $('input#excludeVideo').checked          = false;
+    $('input#excludeSound').checked          = false;
+    $('input#excludeSticker').checked        = false;
+    $('input#excludePoll').checked           = false;
+    $('input#excludeEmbed').checked          = false;
+    $('input#excludeForward').checked        = false;
+    $('input#excludeMentionsId').value       = '';
+    $('input#excludeMentionEveryone').checked = false;
+    $('input#excludeExtensions').value       = '';
+    for (const el of ui.undiscordWindow.querySelectorAll('input[data-ext]')) el.checked = false;
+  
+    $('input#minId').value   = '';
+    $('input#maxId').value   = '';
+    $('input#minDate').value = DISCORD_EPOCH_LOCAL;
+    $('input#maxDate').value = '';
+  
+    setDelayDisplay('searchDelay', SEARCH_DEFAULT);
+    setDelayDisplay('deleteDelay', DELETE_DEFAULT);
+    undiscordCore.options.searchDelay = SEARCH_DEFAULT;
+    undiscordCore.options.deleteDelay = DELETE_DEFAULT;
+  
+    $('input#importExcludeServers').value          = '';
+    $('input#importExcludeChannels').value         = '';
+    $('input#importExcludeUsers').value            = '';
+    $('input#importExcludeAllServers').checked     = false;
+    $('input#importExcludeAllChannels').checked    = false;
+    $('input#importExcludeAllDms').checked         = false;
+  
+    renderQueue();
   }
   
   
@@ -3382,6 +3754,7 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
   /** Returns `{ filtered, skipReasons }` after applying every import-mode filter passed in `f`. Each rejected message is attributed to exactly one bucket. */
   function applyImportFilters(messages, f) {
     const skipReasons = {
+      allServers: 0, allChannels: 0, allDms: 0,
       servers: 0, channels: 0, dmUsers: 0,
       dateInterval: 0,
       text: 0, links: 0,
@@ -3390,8 +3763,16 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
     };
     const filtered = [];
     for (const m of messages) {
-      // Import-only exclusions — checked first since matching here drops the
-      // record cheaply before any content / regex scanning.
+      // Type-wide exclusions (the three "Exclude all" pills above the per-ID
+      // selector lists). Checked first so whole categories short-circuit before
+      // any per-record matching runs. excludeAllChannels backs the "Exclude
+      // group DMs" pill — the option name predates the label.
+      if (f.excludeAllServers && m.guildId && m.guildId !== '@me')           { skipReasons.allServers++;  continue; }
+      if (f.excludeAllDms && m.type === 'DM')                                { skipReasons.allDms++;      continue; }
+      if (f.excludeAllChannels && m.type === 'GROUP_DM')                     { skipReasons.allChannels++; continue; }
+  
+      // Per-ID exclusion lists — applied after the wildcards so each wildcard
+      // claims its skipReasons bucket before the per-ID checks can.
       if (f.excludeServersSet.size  && f.excludeServersSet.has(m.guildId))    { skipReasons.servers++;  continue; }
       if (f.excludeChannelsSet.size && f.excludeChannelsSet.has(m.channelId)) { skipReasons.channels++; continue; }
       if (f.excludeUsersSet.size && (m.type === 'DM' || m.type === 'GROUP_DM')
@@ -3427,20 +3808,23 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
   // ============================================================================
   // ORCHESTRATORS
   // ----------------------------------------------------------------------------
-  // startAction (▶︎ Delete button) reads every form input, validates, captures
-  // the auth token, parses the queue, expands jobs across (target × author),
-  // runs a permission pre-flight, and dispatches to undiscordCore.run() (single
-  // target+author) or undiscordCore.runBatch() (multiple jobs). Routes to
-  // startImportAction() when an export has been imported.
+  // startAction (▶︎ Delete button) is a meta-orchestrator: it gathers every
+  // queued selection snapshot (selectionQueue) plus the current form (when not
+  // blank), then iterates them sequentially. Each iteration applies the snapshot
+  // to the live form and dispatches to runSearchModeFromForm or
+  // runImportModeFromForm based on the snapshot's mode.
+  //
+  // Per-snapshot dispatchers read every form input, validate, parse the queue,
+  // expand jobs across (target × author), run a permission pre-flight (search
+  // mode only), and call undiscordCore.run() (single target+author) or
+  // undiscordCore.runBatch() (multiple jobs).
   // ============================================================================
   
-  /** Import-mode entry point — peer of startAction(). Pre-filters the imported set with every applicable filter, then hands a single synthetic job carrying an ImportSource into core. */
-  async function startImportAction() {
-    if (!importedSet) return log.error('Import mode active but no imported set — clear and re-import.');
-  
+  /** Import-mode dispatcher. Pre-filters `importedSet` with every applicable filter, then hands a single synthetic job carrying an ImportSource into core. The caller (startAction) is responsible for the log-clear and the importedSet null-check. `askForConfirmation` lets the meta-orchestrator suppress the yes/no prompt for snapshots after the first — re-prompting between selections in the same meta-batch trains the user to click Yes without reading. */
+  async function runImportModeFromForm(authToken, askForConfirmation = true) {
     // Date / Messages interval: applied as a client-side pre-pass against each
     // record's ISO timestamp. Messages interval (snowflake range) wins when both
-    // are set, mirroring search-mode precedence in startAction below.
+    // are set, mirroring search-mode precedence in runSearchModeFromForm below.
     const minId = $('input#minId').value.trim();
     const maxId = $('input#maxId').value.trim();
     const minDate = $('input#minDate').value.trim();
@@ -3490,6 +3874,13 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
     const excludeChannelsSet = readIdSet('importExcludeChannels');
     const excludeUsersSet    = readIdSet('importExcludeUsers');
   
+    // Type-wide pills — drop every guild message / 1:1 DM / group DM
+    // respectively. excludeAllChannels backs the "Exclude group DMs" pill;
+    // the option name predates the label.
+    const excludeAllServers  = $('input#importExcludeAllServers').checked;
+    const excludeAllDms      = $('input#importExcludeAllDms').checked;
+    const excludeAllChannels = $('input#importExcludeAllChannels').checked;
+  
     const noopToggles = [];
     if ($('input#excludeSticker').checked) noopToggles.push('sticker');
     if ($('input#excludePoll').checked)    noopToggles.push('poll');
@@ -3514,6 +3905,7 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
     }
   
     const { filtered, skipReasons } = applyImportFilters(importedSet.messages, {
+      excludeAllServers, excludeAllChannels, excludeAllDms,
       excludeServersSet, excludeChannelsSet, excludeUsersSet,
       minMs, maxMs,
       contentMatch, excludeLink,
@@ -3526,13 +3918,8 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
       return log.error(`Filters left zero messages from the import (had ${importedSet.messages.length}). Adjust Date or Messages interval, or click "All".`);
     }
   
-    const authToken = fillToken();
-    if (!authToken) return; // fillToken already logs an error.
-  
     const deleteDelay = getDelayMs('deleteDelay');
     const streamerMode = $('input#streamerMode').checked;
-  
-    ui.logArea.innerHTML = '';
   
     currentJobInfo = { i: 1, n: 1 }; // import mode is always single-job
     undiscordCore.resetState();
@@ -3546,6 +3933,7 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
       pinnedMode: 'include', // export records have no pin metadata; "include" is the no-op
       deleteDelay,
       streamerMode,
+      askForConfirmation,
     });
   
     const skipped = importedSet.messages.length - filtered.length;
@@ -3557,6 +3945,9 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
     // Categories that are neither configured nor matched stay hidden.
     const dateConfigured = (minMs > -Infinity) || (maxMs < Infinity);
     const breakdown = [
+      ['All servers (wildcard)',    skipReasons.allServers,   excludeAllServers],
+      ['All 1:1 DMs (wildcard)',    skipReasons.allDms,       excludeAllDms],
+      ['All group DMs (wildcard)',  skipReasons.allChannels,  excludeAllChannels],
       ['Servers',                   skipReasons.servers,      excludeServersSet.size > 0],
       ['Channels',                  skipReasons.channels,     excludeChannelsSet.size > 0],
       ['DM users',                  skipReasons.dmUsers,      excludeUsersSet.size > 0],
@@ -3663,12 +4054,10 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
     return { jobs, warnings };
   }
   
-  /** Search-mode entry point. Reads every form input, validates, captures the auth token, parses the queue, expands jobs across (target × author), runs a permission pre-flight, and dispatches into core. Routes to startImportAction() when an export has been imported. */
-  async function startAction() {
-    if (importedSet) return startImportAction();
-  
+  /** Search-mode dispatcher. Reads every form input, validates, parses the queue, expands jobs across (target × author), runs a permission pre-flight, and dispatches into core. The caller (startAction) handles the log-clear and import-mode routing. `askForConfirmation` lets the meta-orchestrator suppress the yes/no prompt for snapshots after the first. */
+  async function runSearchModeFromForm(authToken, askForConfirmation = true) {
     // Edge case: empty Author ID. Fill the UI field with your own ID so the
-    // rest of startAction sees a populated input. The notice itself is deferred
+    // rest of the function sees a populated input. The notice itself is deferred
     // to onStart so it lands AFTER the "Started at..." line. Streamer mode
     // redacts the ID in the log line — the input itself is dotted out via CSS.
     const authorInput = $('input#authorId');
@@ -3729,10 +4118,7 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
     const { authorList, minDateUsed, warning } = validation;
     if (warning) log.warn(warning);
   
-    // ---- Token + queue ----
-    const authToken = fillToken();
-    if (!authToken) return; // fillToken already logs an error.
-  
+    // ---- Queue ----
     const { targets, orphans } = parseTargets();
     if (!targets.length) return log.error('You must fill the "Server ID" field!');
     if (orphans) log.warn(`${orphans} channel entr${orphans === 1 ? 'y has' : 'ies have'} no server and will be skipped. Channels need a parent server.`);
@@ -3744,8 +4130,6 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
     // Manage Messages or Administrator on its target server. One API call total.
     const ok = await checkBatchPermissions(jobs, authToken);
     if (!ok) return;
-  
-    ui.logArea.innerHTML = '';
   
     // ---- Run ----
     // Reset to 1/N — runBatch will overwrite via onJob in batch mode; single-job
@@ -3773,6 +4157,7 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
       searchDelay,
       deleteDelay,
       streamerMode,
+      askForConfirmation,
     });
   
     if (jobs.length === 1) {
@@ -3785,6 +4170,170 @@ __modules["src/undiscord-ui.js"] = (__exports) => {
       try { await undiscordCore.runBatch(jobs); }
       catch (err) { log.error('CoreException', err); }
     }
+  }
+  
+  /** Returns true when a snapshot has no targets, no import, and no author. The meta-orchestrator uses this to decide whether to append the current form as a trailing snapshot — a blank form after queued batches just runs the queue without a phantom empty pass at the end. */
+  function isSnapshotBlank(snap) {
+    if (snap.importedSet) return false;
+    if (snap.guildId.trim() || snap.channelId.trim()) return false;
+    if (snap.authorId) return false;
+    return true;
+  }
+  
+  /** Click handler for the Batch Selection sidebar button. Snapshots the current form, validates it, runs the pre-flight permission check (when a non-self author is present), pushes the snapshot onto selectionQueue, and resets the form. Failures abort without queuing — the user gets an explicit log line instead of silently building a poisoned queue. */
+  async function queueSelectionAction() {
+    const snap = captureSnapshot();
+    if (isSnapshotBlank(snap)) {
+      return log.warn('Batch Selection: nothing to queue — set a target / author / import first.');
+    }
+  
+    // Dedup — if an exact-match snapshot is already queued, refuse rather than
+    // silently double-queue. Compares every captured field; importedSet by
+    // identity so two snapshots over the same loaded import collide as expected.
+    const newKey = snapshotKey(snap);
+    const dupeIdx = selectionQueue.findIndex(s => snapshotKey(s) === newKey);
+    if (dupeIdx !== -1) {
+      return log.warn(`Batch Selection: this selection is identical to queued snapshot #${dupeIdx + 1} — not queueing a duplicate.`);
+    }
+  
+    // Soft redundancy warning — fires when one snapshot fully subsumes the
+    // other. Never blocks; the worst case is harmless 404s on already-deleted
+    // messages, and finer-grained policing isn't ours to do.
+    for (let i = 0; i < selectionQueue.length; i++) {
+      const prior = selectionQueue[i];
+      if (snapshotASubsumesB(prior, snap)) {
+        log.warn(`Batch Selection: queued snapshot #${i + 1} already wipes everything this selection targets. Queueing anyway — this run will mostly produce 404s for already-deleted messages.`);
+      } else if (snapshotASubsumesB(snap, prior)) {
+        log.warn(`Batch Selection: this selection wipes everything in queued snapshot #${i + 1}. Queueing anyway — snapshot #${i + 1} runs first; this selection will then re-cover its scope and produce 404s on the duplicated portion.`);
+      }
+    }
+  
+    // Import mode: validate the date / message-ID bounds in the same shape
+    // runImportModeFromForm does. No pre-flight — deletion runs against the
+    // user's own export only.
+    if (snap.importedSet) {
+      const { minId, maxId, minDate, maxDate } = snap;
+      if (minId && !/^\d+$/.test(minId)) return log.error(`Batch Selection: "After message ID" must be numeric, got "${minId}"`);
+      if (maxId && !/^\d+$/.test(maxId)) return log.error(`Batch Selection: "Before message ID" must be numeric, got "${maxId}"`);
+      if (minId && maxId && BigInt(minId) >= BigInt(maxId)) {
+        return log.error('Batch Selection: "After message ID" must be older than "Before message ID".');
+      }
+      if (minDate && Number.isNaN(new Date(minDate).getTime())) return log.error('Batch Selection: invalid "After date".');
+      if (maxDate && Number.isNaN(new Date(maxDate).getTime())) return log.error('Batch Selection: invalid "Before date".');
+  
+      selectionQueue.push(snap);
+      renderQueueBadge();
+      log.info(`Queued selection #${selectionQueue.length} (import mode).`);
+      resetAllSelection();
+      return;
+    }
+  
+    // Search-mode snapshots: full validation + pre-flight.
+    const validation = validateRunInputs({
+      minId:           snap.minId,
+      maxId:           snap.maxId,
+      authorId:        snap.authorId,
+      mentions:        snap.mentionsId,
+      excludeMentions: snap.excludeMentionsId,
+      content:         snap.content,
+      excludeContent:  snap.excludeSearch,
+      minDate:         snap.minDate,
+      maxDate:         snap.maxDate,
+    });
+    if (validation.error) return log.error(`Batch Selection: ${validation.error}`);
+  
+    const authToken = fillToken();
+    if (!authToken) return;
+  
+    // parseTargets reads the live form. captureSnapshot ran milliseconds ago
+    // against the same fields, so the values match the snapshot we're queuing.
+    const { targets } = parseTargets();
+    if (!targets.length) return log.error('Batch Selection: queue is empty — add a server, channel, or DM first.');
+  
+    // Empty Author ID defaults to self at run time (matches startAction).
+    const authorList = validation.authorList.length ? validation.authorList : [getAuthorId() || ''].filter(Boolean);
+    const { jobs } = expandJobs(targets, authorList);
+  
+    const ok = await checkBatchPermissions(jobs, authToken);
+    if (!ok) {
+      log.error('Batch Selection: snapshot rejected — pre-flight permission check failed (see above). Selection NOT queued.');
+      return;
+    }
+  
+    selectionQueue.push(snap);
+    renderQueueBadge();
+    log.info(`Queued selection #${selectionQueue.length} — ${jobs.length} job${jobs.length === 1 ? '' : 's'} ready.`);
+    resetAllSelection();
+  }
+  
+  /** Meta-orchestrator wired to the ▶︎ Delete button. Builds the list of snapshots to run (queued first, current form last unless it's blank), then iterates and dispatches each via runSearchModeFromForm or runImportModeFromForm. Each dispatch is independent — core.resetState/resetOptions per call prevents state bleed. The selectionQueue drains when the meta-batch finishes (or stops mid-way) so subsequent runs start clean. */
+  async function startAction() {
+    if (undiscordCore.state.running) return log.warn('A run is already in progress.');
+  
+    const authToken = fillToken();
+    if (!authToken) return;
+  
+    const snapshots = [...selectionQueue];
+    const currentSnap = captureSnapshot();
+    if (!isSnapshotBlank(currentSnap)) snapshots.push(currentSnap);
+  
+    if (snapshots.length === 0) {
+      return log.error('Nothing to run — set up a selection (or queue one) first.');
+    }
+  
+    ui.logArea.innerHTML = '';
+  
+    const total = snapshots.length;
+    if (total > 1) log.info(`Meta-batch: running ${total} selection${total === 1 ? '' : 's'} sequentially.`);
+  
+    // Confirmation prompt fires only on the first selection. The user already
+    // confirmed the intent of running the queued batches when they hit Delete;
+    // re-prompting between snapshots would just train them to click "Yes" without
+    // reading. Declining the first prompt aborts the entire meta-batch.
+    let confirmationConsumed = false;
+  
+    for (let i = 0; i < snapshots.length; i++) {
+      const snap = snapshots[i];
+      if (total > 1) log.info(`══════ Selection ${i + 1}/${total} ══════`);
+  
+      // Replay into the live form so the dispatchers (which read from form
+      // elements) see the snapshot's values. Restore importedSet too, since
+      // mode dispatch is keyed off it.
+      applySnapshot(snap);
+      importedSet = snap.importedSet;
+      if (importedSet) {
+        ui.undiscordWindow.classList.add('import-mode');
+        $('#importBadge').style.display = 'inline-flex';
+      } else {
+        ui.undiscordWindow.classList.remove('import-mode');
+        $('#importBadge').style.display = 'none';
+      }
+      renderImportSummary();
+  
+      const askForConfirmation = !confirmationConsumed;
+      if (importedSet) await runImportModeFromForm(authToken, askForConfirmation);
+      else             await runSearchModeFromForm(authToken, askForConfirmation);
+  
+      // user-declined (first prompt) and user-stopped (Stop mid-run) both
+      // abort the remaining meta-batch — barging on after either would betray
+      // the user's intent.
+      if (undiscordCore.state.endReason === 'user-declined') {
+        if (i < snapshots.length - 1) {
+          log.warn(`Meta-batch aborted at selection ${i + 1}/${total} — ${total - i - 1} remaining selection${total - i - 1 === 1 ? '' : 's'} skipped (you declined the confirmation prompt).`);
+        }
+        break;
+      }
+      if (undiscordCore.state.endReason === 'user-stopped' && i < snapshots.length - 1) {
+        log.warn(`Meta-batch stopped at selection ${i + 1}/${total} — ${total - i - 1} remaining selection${total - i - 1 === 1 ? '' : 's'} skipped.`);
+        break;
+      }
+  
+      confirmationConsumed = true;
+    }
+  
+    selectionQueue = [];
+    renderQueueBadge();
+    if (total > 1) log.info('Meta-batch finished.');
   }
   
   /** Click handler for the 🛑 Stop button. Forwards to core.stop(). */

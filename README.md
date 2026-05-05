@@ -52,6 +52,8 @@ I only plan to update it if it breaks severely, there are enough safety guards b
 
 - **Multi-server / multi-channel batching** with `Add` / `Select` / `Delete` controls and a live queue display. The original technically supported batching — comma-separated channel IDs in one input for channels only — but it was basically undocumented and miserable to use manually. Dedicated buttons and a smarter queue let you mix entire-server wipes with channel-specific entries however you want.
 
+- **Batch Selection (queue of queues).** Build one selection — targets, filters, intervals — click `Batch Selection +` to snapshot it, then build a totally different one and snapshot that too. Click `▶︎ Delete` and every queued snapshot runs sequentially with its own settings. Useful when one wipe wants strict text matching and another wants attachment-only, or when one job is server-wide and another is a date-bounded DM cleanup — no more babysitting the form between runs. Pre-flight permission checks run at queue time so a bad snapshot is rejected before it's added; the confirmation prompt only fires on the first selection.
+
 - **Point-and-click ID capture.** Hit `Select` on any field, then click an avatar / message / server icon / channel in Discord — the relevant ID drops into the field. Hold Shift to capture several in a row. Faster than Developer Mode + Copy ID for everything except cross-server lookups.
 
 - **Discord data export import.** Pre-load message IDs from your Discord data export and skip the search phase entirely — roughly 3-5x faster on large wipes. See [Import mode](#import-mode) below.
@@ -127,6 +129,27 @@ The trash icon (whether mounted in the server bar or shown as the fallback FAB) 
 
 ![alt text](readmeImages/{F13378F4-AB38-48D5-88D2-BF5E36C162BE}.png)
 
+### Batching multiple selections
+
+Sometimes a single configuration isn't enough — one wipe wants strict text matching, another wants every attachment, a third is a date-bounded DM cleanup. Rather than running each manually and waiting, queue them up:
+
+1. Build the first selection — set Author / targets / filters / intervals like normal.
+2. Click **`Batch Selection +`** instead of Delete. The form snapshots into a queue (the `queued: N` chip in the sidebar shows the count) and resets to defaults so you can start the next one.
+3. Build the next selection. Add it the same way. Repeat as many times as you want.
+4. When you're ready, click **`▶︎ Delete`**. Every queued snapshot runs sequentially with its own captured settings; if the form is also non-blank when you click, that selection runs as the trailing entry.
+
+**Pre-flight at queue time.** When a snapshot includes a non-self author, the permission pre-flight runs the moment you click `Batch Selection +` — so a bad snapshot (missing Manage Messages on some target server) is rejected before it gets queued. You'll never reach Delete and discover a snapshot was poisoned.
+
+**Exact-duplicate block.** If you queue a selection that's byte-identical to one already in the queue, it's rejected with a log line — saves you from accidentally running the same wipe twice in a row.
+
+**Soft redundancy warning.** Beyond exact duplicates, the queue checks if any earlier snapshot has filters at default and a scope/author/interval that fully covers the new one (or vice versa). If so, the new selection still queues but a warning logs that one of the two will be doing mostly-redundant work. Anything subtler than that — partial overlaps, filter-subset relationships — is left alone; you know what you queued.
+
+**Single confirmation.** The browser confirm dialog fires only on the first selection. The user already confirmed the intent of the meta-batch when they hit Delete. Declining the first prompt aborts the entire meta-batch.
+
+**`Reset Selection`** wipes the current form back to defaults without touching the queue, the log, or the streamer-mode / auto-scroll toggles. Useful when you want to discard the in-progress form without losing the snapshots you've already queued.
+
+**`drop batches`** — the red chip next to the queue counter discards every queued snapshot in one click. Doesn't touch the current form. Use when you've queued a few and want to start over.
+
 ### Verify
 
 **`📋 Verify`** prints a structured snapshot of the current run config to the log without starting anything. Mode (live / import), queue contents grouped by server, every active filter on both sides, both intervals, and the current delay values. Useful when you've toggled a lot of switches and want to sanity-check what `▶︎ Delete` will actually do before you click it.
@@ -183,6 +206,7 @@ If you've already requested your Discord data (User Settings → Privacy & Safet
 - Skip extension (presets + custom semicolon-separated list) — extension is taken from the attachment URL.
 - Skip @user / Skip @everyone/@here — Discord's export keeps user mentions as `<@USERID>` (and `@everyone`/`@here` as literal text) inline in `Contents`, so a content regex recovers them.
 - **Exclude Server / Channel / DM-with-User** — three import-only fields right under the folder picker. Comma-separated snowflake IDs (Server accepts `@me` too — useful for "drop every DM"). Each has a `Select` button for point-and-click capture (Shift to capture several in a row) and a `Clear` button. Server matches against `guildId`, Channel against `channelId`, User against the channel's `recipients` list (so any group DM containing that user is dropped).
+- **Exclude all** wildcards — three pill toggles below the import summary (`Exclude servers`, `Exclude DMs`, `Exclude group DMs`) drop entire categories without listing IDs. Convenient when you want to wipe only DMs from a multi-year export, or only servers, or only group DMs. Stacks with the per-ID exclusions above — anything dropped by a wildcard is attributed to its own bucket in the run-start breakdown.
 - Delete delay (paces the actual DELETE requests).
 - Streamer mode (redacts message content *and* usernames in the log + confirmation preview).
 

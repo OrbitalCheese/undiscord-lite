@@ -12,6 +12,7 @@ import {
   log,
   msToHMS,
   escapeHTML,
+  redactHtml,
   queryString,
   askYesNo,
   toSnowflake,
@@ -715,14 +716,21 @@ class UndiscordCore {
 
       const message = this.state._messagesToDelete[i];
 
-      const sm = this.options.streamerMode;
-      const author = sm ? '••••' : `${message.author?.username ?? '[system]'}#${message.author?.discriminator ?? '0'}`;
+      // Streamer-mode redaction lives in the DOM via redactHtml dual-spans;
+      // CSS toggles which side is visible. Decoupling redaction from the run-
+      // time `streamerMode` option means flipping the checkbox mid-run
+      // immediately redacts every already-printed line.
+      const author = `${message.author?.username ?? '[system]'}#${message.author?.discriminator ?? '0'}`;
+      const content = (message.content ?? '').replace(/\n/g, '↵');
+      const attachments = message.attachments?.length
+        ? ' ' + redactHtml(JSON.stringify(message.attachments), '[ATTACHMENTS]')
+        : '';
       log.debug(
         `[${this.state.delCount + 1}/${this.state.grandTotal}] ` +
         `<sup>${new Date(message.timestamp).toLocaleString()}</sup> ` +
-        `<b>${escapeHTML(author)}</b>` +
-        `: <i>${escapeHTML(sm ? '••••' : (message.content ?? '')).replace(/\n/g, '↵')}</i>` +
-        (message.attachments?.length ? (sm ? ' [ATTACHMENTS]' : escapeHTML(JSON.stringify(message.attachments))) : ''),
+        `<b>${redactHtml(author)}</b>` +
+        `: <i>${redactHtml(content)}</i>` +
+        attachments,
         `<sup>{ID:${escapeHTML(message.id)}}</sup>`
       );
 

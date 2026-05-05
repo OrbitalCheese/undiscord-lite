@@ -42,6 +42,11 @@ export const msToHMS = s => `${s / 3.6e6 | 0}h ${(s % 3.6e6) / 6e4 | 0}m ${(s % 
 /** HTML-escapes a value (& < " ') for safe injection into innerHTML. */
 export const escapeHTML = html => String(html).replace(/[&<"']/g, m => ({ '&': '&amp;', '<': '&lt;', '"': '&quot;', '\'': '&#039;' })[m]);
 
+/** Emits the `.sm-real / .sm-redacted` dual-span used by streamer-mode log redaction. CSS at panel scope shows exactly one of the two spans depending on whether `.streamer-on` is set, so toggling streamer mode instantly re-renders every already-printed log line. The real value is HTML-escaped; the placeholder defaults to '••••' (callers pass e.g. '[ATTACHMENTS]' for non-ID redactions). */
+export function redactHtml(real, placeholder = '••••') {
+  return `<span class="sm-real">${escapeHTML(String(real))}</span><span class="sm-redacted">${escapeHTML(placeholder)}</span>`;
+}
+
 /** Joins a `[[key, value], ...]` array into a URL query string, skipping pairs whose value is undefined. Values are URL-encoded. */
 export const queryString = params => params.filter(p => p[1] !== undefined).map(p => p[0] + '=' + encodeURIComponent(p[1])).join('&');
 

@@ -1,10 +1,12 @@
 // ============================================================================
 // UNDISCORD-LITE — UI LAYER
 // ----------------------------------------------------------------------------
-// Owns the panel HTML, CSS, every event binding, and the two run orchestrators
-// (search-mode startAction / import-mode startImportAction). All Discord page
-// I/O — token, URL parsing, server-bar injection, point-and-click ID capture —
-// happens here. The delete pipeline itself lives in undiscord-core.js.
+// Owns the panel HTML, CSS, every event binding, and the run orchestrators —
+// the meta-orchestrator startAction(), per-snapshot dispatchers
+// runSearchModeFromForm / runImportModeFromForm, and the Batch Selection
+// queue flow. All Discord page I/O — token, URL parsing, server-bar injection,
+// point-and-click ID capture — happens here. The delete pipeline itself
+// lives in undiscord-core.js.
 // ============================================================================
 
 const LOG_PREFIX = '[UNDISCORD-LITE]';
@@ -16,7 +18,7 @@ import UndiscordCore from './undiscord-core';
 import Drag from './ui/drag';
 import { parseExport, summarizeImport, ImportSource } from './export-import';
 import {
-  createElm, insertCss, log, setLogFn, msToHMS,
+  createElm, insertCss, log, setLogFn, msToHMS, redactHtml,
   getAuthorId, getGuildId, getChannelId, fillToken, snowflakeToMs,
   parseCsvList, buildContentMatcher, buildExtensionMatcher,
 } from './helpers';
@@ -54,8 +56,9 @@ const $ = s => ui.undiscordWindow.querySelector(s);
 
 // Loaded Discord data export (post-parse). Null when no import is active.
 // Shape: { messages, channelCount, oldestTs, newestTs } as returned by parseExport().
-// When set, startAction() routes through startImportAction() and the General /
-// Search filter / Delete filter UI sections grey out (CSS via .import-mode).
+// When set, startAction() routes the per-snapshot dispatch through
+// runImportModeFromForm() and the General / Search filter / Delete filter UI
+// sections grey out (CSS via .import-mode).
 let importedSet = null;
 
 // One-shot log message printed right after the "Started at..." line. Used by
@@ -68,12 +71,11 @@ let pendingStartNotice = null;
 // onJob) display "Job 1/1" in the top bar instead of leftover values.
 let currentJobInfo = { i: 1, n: 1 };
 
-/** Streamer-mode redaction. Returns '••••' when the Streamer mode toggle is on, the value as-is otherwise. '@me' passes through verbatim — it's a literal Discord URL token, not a sensitive ID, and the queue-management logs read clearer with it intact. Empty / null inputs pass through so callers don't have to null-guard. */
+/** Streamer-mode redaction. Emits a `redactHtml` dual-span so log lines render either the real value or '••••' depending on the panel's `.streamer-on` class — CSS-toggled, so already-printed log lines re-render the moment the streamer-mode checkbox flips. '@me' passes through verbatim (literal Discord URL token, not a sensitive ID). Empty / null inputs pass through so callers don't have to null-guard. */
 function dot(v) {
   if (v == null || v === '') return v;
-  if (!$('input#streamerMode')?.checked) return v;
   if (v === '@me') return '@me';
-  return '••••';
+  return redactHtml(v);
 }
 
 
@@ -89,10 +91,12 @@ function dot(v) {
 // inputs to grouped format on the next click.
 // ============================================================================
 
-/** Parses the Server / Channel inputs into a flat `[{guildId, channelId}, ...]` target list. Channel entries with no parent server (orphans) are counted but not included in the list. */
-function parseTargets() {
-  const guildRaw = $('input#guildId').value.trim();
-  const channelRaw = $('input#channelId').value.trim();
+/** Parses the Server / Channel inputs into a flat `[{guildId, channelId}, ...]` target list. Channel entries with no parent server (orphans) are counted but not included in the list. Defaults to reading the live form fields; callers can pass raw strings instead (used by the redundancy check to parse snapshot targets without touching the DOM). */
+function parseTargets(guildRaw, channelRaw) {
+  if (guildRaw   === undefined) guildRaw   = $('input#guildId').value;
+  if (channelRaw === undefined) channelRaw = $('input#channelId').value;
+  guildRaw   = guildRaw.trim();
+  channelRaw = channelRaw.trim();
   const servers = guildRaw ? guildRaw.split(/\s*,\s*/) : [];
 
   const targets = [];
@@ -548,6 +552,18 @@ function initUI() {
   };
   $('button#verify').onclick = verifyAction;
   $('button#clear').onclick = () => ui.logArea.innerHTML = '';
+  $('button#resetSelection').onclick = () => {
+    resetAllSelection();
+    log.info('Selection reset to defaults.');
+  };
+  $('button#queueSelection').onclick = queueSelectionAction;
+  $('button#dropBatches').onclick = () => {
+    if (selectionQueue.length === 0) return;
+    const n = selectionQueue.length;
+    selectionQueue = [];
+    renderQueueBadge();
+    log.info(`Dropped ${n} queued batch${n === 1 ? '' : 'es'}.`);
+  };
   $('button#getAuthor').onclick = () => {
     const id = getAuthorId();
     if (id) $('input#authorId').value = id;
@@ -634,6 +650,7 @@ function initUI() {
   $('input#guildId').addEventListener('change', cleanupOrphanedMe);
   $('input#channelId').addEventListener('change', cleanupOrphanedMe);
   renderQueue();
+  renderQueueBadge();
 
   // Import data export — folder picker, summary, clear button.
   bindImportControls();
@@ -883,7 +900,7 @@ const HELP_TEXT = {
     name: 'Messages interval',
     lines: [
       "Bound the wipe to a snowflake range using two message IDs.",
-      "Right-click any message → <b>Copy Message Link</b>, paste into either field. The script auto-strips the URL down to just the ID.",
+      "Right-click any message → <b>Copy Message Link</b>, paste into either field. The script <b>auto-strips the URL</b> down to just the trailing message ID — no manual cleanup needed. Pasting a bare snowflake also works directly.",
       "<b>Messages interval overrides Date interval</b> if both are set.",
     ],
   },
@@ -914,6 +931,8 @@ const HELP_TEXT = {
       "&nbsp;&nbsp;2. Right-click their profile icon &rarr; <b>Copy User ID</b>.",
       "&nbsp;&nbsp;3. Right-click a message &rarr; <b>Copy Message ID</b> (also useful for Messages interval).",
       "To chain multiple people, comma-separate the IDs: <code>id1,id2,id3</code>. The run expands to one job per (target × author).",
+      "<b>Auto-format on paste:</b> pasting one snowflake-shaped ID, or a comma-separated list of them, appends to the current value with deduplication — no need to manually edit the existing text. Pastes that aren't snowflake-shaped fall through to native paste so you can correct typos.",
+      "Click <b>Select</b> to enter point-and-click capture mode, then click any user / avatar / message author in Discord to capture their User ID — hold Shift to capture several in a row.",
       "Non-self authors require <i>Manage Messages</i> permission on their target server. A pre-flight check runs once at the top of the batch and aborts early if any pair lacks it.",
       "DMs are excluded from multi-author batching — Discord only lets you delete your own DM messages, so each DM target spawns one self-author job regardless of how many IDs are in the list.",
       "<b>Exclude NSFW channels</b> checkbox (default off): when checked, age-gated channels return zero results from Discord's search API. Default behavior is to include them.",
@@ -972,6 +991,7 @@ const HELP_TEXT = {
     lines: [
       "Restrict the search to messages where this user is @mentioned.",
       "<b>Single user only</b> — Discord's search API can only filter by one mentioned user per request, so this field accepts exactly one ID. Pasting or capturing a new ID overwrites the current value.",
+      "<b>Auto-format on paste:</b> pasting a snowflake-shaped ID overwrites the field directly. Non-snowflake clipboards fall through to native paste so you can edit freely.",
       "If you need to match several mentioned users, run separate passes (one per ID). The asymmetry only affects this side — see <b>Skip @user</b> for the multi-value variant.",
       "Toggle <b>has @everyone / @here</b> to also include messages that pinged everyone or online users.",
       "Right-click a user &rarr; <b>Copy User ID</b> (Developer Mode required), or use <b>Select</b> and click any avatar/username in the message list.",
@@ -1011,6 +1031,7 @@ const HELP_TEXT = {
     lines: [
       "Skip messages where any of these users are @mentioned — they survive the run.",
       "<b>Multi-value</b> — comma-separate any number of user IDs, or paste/capture them one at a time and they'll append (with dedup). Every listed ID is checked against each message's mentions at filter time, so all of them work in a single pass — unlike <b>Include @user</b>, this side has no API limit because it's a client-side check after the search response.",
+      "<b>Auto-format on paste:</b> pasting a single snowflake-shaped ID, or a comma-separated list, appends to the current value with deduplication. Non-snowflake clipboards fall through to native paste.",
       "Toggle <b>skip @everyone / @here</b> to also skip messages that pinged everyone or online users.",
       "Right-click a user &rarr; <b>Copy User ID</b> (Developer Mode required), or use <b>Select</b> and click avatars/usernames; hold Shift to capture several in a row.",
       "An ID listed here cannot also be in <b>Include @user</b> — that combination would always match nothing.",
@@ -1020,7 +1041,8 @@ const HELP_TEXT = {
     name: 'Messages interval',
     lines: [
       "Bound the search to messages between two specific message IDs (Discord snowflakes).",
-      "Right-click a message &rarr; <b>Copy Message Link</b>, then paste into either field — the script auto-strips the URL to just the trailing message ID.",
+      "<b>Auto-format on paste:</b> right-click a message &rarr; <b>Copy Message Link</b>, then paste into either field — the script auto-strips the URL down to just the trailing message ID. Pasting a bare snowflake also works directly. Non-link clipboards fall through to native paste.",
+      "Click <b>Select</b> next to either field to enter point-and-click capture mode, then click any message in Discord to capture its ID.",
       "<b>After ID</b> must be older (smaller snowflake) than <b>Before ID</b>.",
       "If only one bound is set, the other is unbounded (channel start or current time).",
       "<b>Messages interval overrides Date interval</b> if both are set.",
@@ -1085,8 +1107,10 @@ const HELP_TEXT = {
     name: 'Import — Exclude Server',
     lines: [
       "Drop entire <b>servers</b> from the import before the delete loop runs. Comma-separate any number of Server IDs.",
-      "Click <b>Select</b> and then click a server icon in Discord to capture its ID — hold Shift to capture several in a row. Pasting one or more snowflake-shaped IDs appends with deduplication.",
+      "Click <b>Select</b> and then click a server icon in Discord to capture its ID — hold Shift to capture several in a row.",
+      "<b>Auto-format on paste:</b> pasting one snowflake-shaped ID, or a comma-separated list, appends to the current value with deduplication. Non-snowflake clipboards fall through to native paste.",
       "Matches against each message's <code>guildId</code> as recorded in <code>channel.json</code>. <b>Use <code>@me</code></b> to drop every DM and group DM in one go (they all carry <code>guildId=@me</code>).",
+      "For a wildcard \"drop every server\" pass, see the <b>Exclude servers</b> pill above the selector fields — the convenience equivalent of listing every server ID here.",
       "Servers in the export but not currently joined still match — the filter is purely client-side against the export data.",
     ],
   },
@@ -1095,7 +1119,9 @@ const HELP_TEXT = {
     lines: [
       "Drop specific <b>channels</b> from the import. Comma-separate any number of channel IDs (works for guild channels, DMs, and group DMs alike — they all use the same snowflake format).",
       "Click <b>Select</b> and then click a channel in the sidebar (or any message inside one) to capture its ID — hold Shift to capture several in a row.",
+      "<b>Auto-format on paste:</b> pasting one snowflake-shaped ID, or a comma-separated list, appends with deduplication. Non-snowflake clipboards fall through to native paste.",
       "Matches against each message's <code>channelId</code>. Independent of <b>Exclude Server</b> — a channel listed here is dropped even if its parent server isn't excluded.",
+      "For a wildcard \"drop every group DM\" pass, see the <b>Exclude group DMs</b> pill above the selector fields.",
     ],
   },
   importExcludeUser: {
@@ -1103,7 +1129,9 @@ const HELP_TEXT = {
     lines: [
       "Drop <b>DMs</b> and <b>group DMs</b> that include the listed user(s) as participants. Comma-separate any number of User IDs.",
       "Click <b>Select</b> and then click an avatar / username / message author in Discord to capture the User ID — hold Shift to capture several in a row.",
+      "<b>Auto-format on paste:</b> pasting one snowflake-shaped ID, or a comma-separated list, appends with deduplication. Non-snowflake clipboards fall through to native paste.",
       "Matches against the channel's <code>recipients</code> list (from <code>channel.json</code>). For group DMs, any single matched recipient drops the whole group.",
+      "For a wildcard \"drop every 1:1 DM\" pass, see the <b>Exclude DMs</b> pill above the selector fields.",
       "<b>Guild messages are unaffected by design</b> — every message in your own data export was sent <i>by</i> you, so there's no other-author dimension to filter on. Use <b>Exclude Channel</b> if you want to spare specific guild channels.",
     ],
   },
@@ -1659,6 +1687,21 @@ function printLog(type = '', args) {
 // bar, and writes the live progress text into the top-bar slot.
 // ============================================================================
 
+// Per-second elapsed-time ticker. onProgress only fires after each delete
+// completes, so elapsed time would freeze during the long search-delay waits
+// between pages without it. lastRemainingMs caches the most recent ETR sample
+// from onProgress so the ticker can rerender both halves of the footer.
+let elapsedTicker = null;
+let lastRemainingMs = 0;
+
+/** Refreshes the footer's elapsed/remaining readout. Called from the per-second ticker AND from onProgress (where lastRemainingMs is also refreshed from stats.etr). */
+function renderFooterTime() {
+  if (!undiscordCore.stats.startTime) return;
+  const elapsed = msToHMS(Date.now() - undiscordCore.stats.startTime.getTime());
+  const remaining = msToHMS(lastRemainingMs);
+  ui.footerTime.textContent = `Elapsed ${elapsed} · Remaining ${remaining}`;
+}
+
 /** Registers core lifecycle hooks. Called once at the end of initUI(). */
 function bindCoreEvents() {
   undiscordCore.onStart = () => {
@@ -1669,6 +1712,15 @@ function bindCoreEvents() {
     if (ui.serverBarBtn) ui.serverBarBtn.classList.add('running');
     ui.progressMain.style.display = 'block';
     ui.topBarSlot.innerHTML = `<span class="status-line status-running">Starting…</span>`;
+
+    // 1 s cadence — keeps the digits moving even while the loop is sleeping
+    // through a search-delay wait. Remaining stays at its last onProgress
+    // sample (an estimate that only changes meaningfully on each delete).
+    lastRemainingMs = 0;
+    if (elapsedTicker) clearInterval(elapsedTicker);
+    elapsedTicker = setInterval(renderFooterTime, 1000);
+    renderFooterTime();
+
     // Drain any one-shot notice startAction stashed (logged here so it lands
     // right after the "Started at..." line instead of getting wiped by the
     // log-clear that runs between startAction and run()).
@@ -1684,14 +1736,11 @@ function bindCoreEvents() {
 
     if (max) {
       const percent = Math.round(value / max * 100) + '%';
-      const elapsed = msToHMS(Date.now() - stats.startTime.getTime());
-      const remaining = msToHMS(stats.etr);
       ui.topBarSlot.innerHTML =
         `<span class="status-line status-running">Deleting... ` +
         `| (${value}/${max}) ${percent} ` +
         `| Failures: ${state.failCount} ` +
         `| Job ${currentJobInfo.i}/${currentJobInfo.n} |</span>`;
-      ui.footerTime.textContent = `Elapsed ${elapsed} · Remaining ${remaining}`;
       ui.progressIcon.setAttribute('max', max);
       ui.progressMain.setAttribute('max', max);
       ui.progressIcon.value = value;
@@ -1708,6 +1757,11 @@ function bindCoreEvents() {
       ui.progressMain.removeAttribute('value');
     }
 
+    // Cache the new ETR sample, then rerender the footer immediately so the
+    // user sees it without waiting for the next ticker beat.
+    lastRemainingMs = stats.etr;
+    renderFooterTime();
+
     // Sync the stepper display to reflect any rate-limit bump/decay applied by core.
     setDelayDisplay('searchDelay', undiscordCore.options.searchDelay);
     setDelayDisplay('deleteDelay', undiscordCore.options.deleteDelay);
@@ -1723,9 +1777,314 @@ function bindCoreEvents() {
     ui.undiscordBtn.classList.remove('running');
     if (ui.serverBarBtn) ui.serverBarBtn.classList.remove('running');
     ui.progressMain.style.display = 'none';
+    if (elapsedTicker) { clearInterval(elapsedTicker); elapsedTicker = null; }
     ui.footerTime.textContent = ''; // clear elapsed/remaining when idle
     renderTopBar();
   };
+}
+
+
+// ============================================================================
+// SELECTION SNAPSHOT / RESET / BATCH QUEUE
+// ----------------------------------------------------------------------------
+// The Reset Selection and Batch Selection sidebar buttons let the user build
+// a meta-batch — multiple independent selections, each with its own filters,
+// target queue, and intervals, run sequentially when Delete is finally
+// clicked. captureSnapshot reads every form input into a plain object;
+// applySnapshot writes one back; resetAllSelection clears the form.
+// selectionQueue holds queued snapshots; the current form is appended last
+// in startAction so queue-then-delete runs queued batches first and the
+// "live" form last.
+//
+// Two safeguards run at queue time:
+//   - Pre-flight permission check (search-mode snapshots with non-self
+//     authors) — failures reject the snapshot, not just the run later.
+//   - Dedup + redundancy detection — exact-match snapshots are blocked
+//     (snapshotKey); strictly-subsumed snapshots log a warning but queue
+//     anyway (snapshotASubsumesB). Anything finer is the user's call.
+// ============================================================================
+
+let selectionQueue = []; // array of snapshots; runs sequentially on next Delete
+
+// Identity tags for imported sets so dedup compares by reference, not by
+// re-stringifying the (potentially huge) parsed export every time.
+const importIdMap = new WeakMap();
+let nextImportId = 1;
+function importIdOf(set) {
+  if (!set) return null;
+  if (!importIdMap.has(set)) importIdMap.set(set, nextImportId++);
+  return importIdMap.get(set);
+}
+
+/** Stable-stringifies a snapshot for dedup comparison. importedSet is replaced with an identity tag (so two snapshots referencing the same parsed export hash to the same key, regardless of its contents); every other field is captured by value via JSON.stringify (insertion-order-stable in V8/SpiderMonkey/JSC, and captureSnapshot always builds the object in the same field order). */
+function snapshotKey(snap) {
+  return JSON.stringify({ ...snap, importedSet: importIdOf(snap.importedSet) });
+}
+
+/** Returns true when every "narrowing" filter knob in `snap` is at its default state. Pinned-mode and NSFW are deliberately not checked — those interact with B's matching values in non-monotonic ways, so the caller compares them between A and B instead. */
+function isFilterless(snap) {
+  // Search filter
+  if (snap.content) return false;
+  if (snap.hasLink || snap.hasImage || snap.hasVideo || snap.hasSound) return false;
+  if (snap.hasSticker || snap.hasPoll || snap.hasEmbed || snap.hasForward) return false;
+  if (snap.mentionsId) return false;
+  if (snap.mentionEveryone) return false;
+  // Skip (Delete) filter
+  if (snap.excludeSearch) return false;
+  if (snap.excludeLink || snap.excludeImage || snap.excludeVideo || snap.excludeSound) return false;
+  if (snap.excludeSticker || snap.excludePoll || snap.excludeEmbed || snap.excludeForward) return false;
+  if (snap.excludeMentionsId) return false;
+  if (snap.excludeMentionEveryone) return false;
+  if (snap.excludeExtensions) return false;
+  if (snap.excludeExtensionPills?.length) return false;
+  // Import-only exclusions
+  if (snap.importExcludeServers || snap.importExcludeChannels || snap.importExcludeUsers) return false;
+  if (snap.importExcludeAllServers || snap.importExcludeAllChannels || snap.importExcludeAllDms) return false;
+  return true;
+}
+
+/** Returns the snapshot's effective {minMs, maxMs} interval. minId/maxId override minDate/maxDate (matching run-time precedence). The Discord-epoch default for minDate is treated as "no lower bound" so factory-default snapshots compare cleanly. */
+function intervalOf(snap) {
+  let minMs = -Infinity, maxMs = Infinity;
+  if (snap.minId) minMs = snowflakeToMs(snap.minId);
+  else if (snap.minDate && snap.minDate !== DISCORD_EPOCH_LOCAL) minMs = new Date(snap.minDate).getTime();
+  if (snap.maxId) maxMs = snowflakeToMs(snap.maxId);
+  else if (snap.maxDate) maxMs = new Date(snap.maxDate).getTime();
+  return { minMs, maxMs };
+}
+
+/** Returns the snapshot's author list as a Set. Empty Author ID resolves to a `__self__` sentinel — across snapshots the user is always the same identity, so two empty-author snapshots compare as authoring the same set without needing to actually look up the self ID. */
+function authorSetOf(snap) {
+  const list = parseCsvList(snap.authorId);
+  return list.length ? new Set(list) : new Set(['__self__']);
+}
+
+/** Returns true when every (server, channel) target in `bTargets` is covered by some target in `aTargets`. A server-wide entry in A (channelId === '') covers any (S, *) in B with the same server; a channel-specific entry only covers an exact match. */
+function targetsCoverAll(aTargets, bTargets) {
+  for (const b of bTargets) {
+    let covered = false;
+    for (const a of aTargets) {
+      if (a.guildId !== b.guildId) continue;
+      if (a.channelId === '' || a.channelId === b.channelId) { covered = true; break; }
+    }
+    if (!covered) return false;
+  }
+  return true;
+}
+
+/** Returns true when running snapshot `a` would delete every message snapshot `b` would, leaving `b` to do mostly-redundant work (404s on already-deleted messages). Both must share a mode (live-search vs same imported set), `a` must be filterless, and `a`'s scope/author/interval must be a superset of `b`'s. Pinned-mode and NSFW exclusion must align in live-search mode (import bypasses both). */
+function snapshotASubsumesB(a, b) {
+  if (Boolean(a.importedSet) !== Boolean(b.importedSet)) return false;
+  if (a.importedSet && a.importedSet !== b.importedSet) return false;
+  if (!isFilterless(a)) return false;
+
+  if (!a.importedSet) {
+    // Live-search-mode-only: pinned-mode and NSFW affect the deletion set in
+    // ways that aren't monotonic in the user's tunables — require an exact
+    // match on both rather than try to model the lattice.
+    if (a.pinnedMode  !== b.pinnedMode)  return false;
+    if (a.excludeNsfw !== b.excludeNsfw) return false;
+
+    const aAuth = authorSetOf(a), bAuth = authorSetOf(b);
+    for (const id of bAuth) if (!aAuth.has(id)) return false;
+
+    const { targets: aTargets } = parseTargets(a.guildId, a.channelId);
+    const { targets: bTargets } = parseTargets(b.guildId, b.channelId);
+    if (!targetsCoverAll(aTargets, bTargets)) return false;
+  }
+
+  const aInt = intervalOf(a), bInt = intervalOf(b);
+  if (aInt.minMs > bInt.minMs) return false;
+  if (aInt.maxMs < bInt.maxMs) return false;
+
+  return true;
+}
+
+/** Refreshes the queue counter badge and the drop-batches button. Both hide entirely when the queue is empty so the badge row collapses to whatever else is there (just the import-mode chip, or nothing at all). */
+function renderQueueBadge() {
+  const badge = $('#queueBadge');
+  const drop  = $('button#dropBatches');
+  if (!badge) return;
+  const n = selectionQueue.length;
+  if (n === 0) {
+    badge.style.display = 'none';
+    if (drop) drop.style.display = 'none';
+    return;
+  }
+  badge.style.display = 'inline-flex';
+  badge.textContent = `queued: ${n}`;
+  if (drop) drop.style.display = 'inline-flex';
+}
+
+/** Snapshots every form input that affects a run into a plain object, ready to be replayed via applySnapshot. The `importedSet` reference is captured by identity (not deep copy) — only one import is loaded at a time, and the user clearing it shouldn't retroactively invalidate already-queued snapshots that were captured against it. */
+function captureSnapshot() {
+  return {
+    // General
+    authorId:        $('input#authorId').value.trim(),
+    excludeNsfw:     $('input#excludeNsfw').checked,
+    guildId:         $('input#guildId').value,
+    channelId:       $('input#channelId').value,
+    excludeGroupDms: $('input#excludeGroupDms').checked,
+    // Search filter
+    content:          $('input#search').value.trim(),
+    hasLink:          $('input#hasLink').checked,
+    hasImage:         $('input#hasImage').checked,
+    hasVideo:         $('input#hasVideo').checked,
+    hasSound:         $('input#hasSound').checked,
+    hasSticker:       $('input#hasSticker').checked,
+    hasPoll:          $('input#hasPoll').checked,
+    hasEmbed:         $('input#hasEmbed').checked,
+    hasForward:       $('input#hasForward').checked,
+    mentionsId:       $('input#mentionsId').value.trim(),
+    mentionEveryone:  $('input#mentionEveryone').checked,
+    pinnedMode:       $('select#pinnedMode').value,
+    // Delete filter
+    excludeSearch:           $('input#excludeSearch').value.trim(),
+    excludeMatchMode:        $('select#excludeMatchMode').value,
+    excludeLink:             $('input#excludeLink').checked,
+    excludeImage:            $('input#excludeImage').checked,
+    excludeVideo:            $('input#excludeVideo').checked,
+    excludeSound:            $('input#excludeSound').checked,
+    excludeSticker:          $('input#excludeSticker').checked,
+    excludePoll:             $('input#excludePoll').checked,
+    excludeEmbed:            $('input#excludeEmbed').checked,
+    excludeForward:          $('input#excludeForward').checked,
+    excludeMentionsId:       $('input#excludeMentionsId').value.trim(),
+    excludeMentionEveryone:  $('input#excludeMentionEveryone').checked,
+    excludeExtensions:       $('input#excludeExtensions').value.trim(),
+    excludeExtensionPills:   Array.from(ui.undiscordWindow.querySelectorAll('input[data-ext]'))
+                                  .filter(el => el.checked)
+                                  .map(el => el.dataset.ext),
+    // Intervals
+    minId:    $('input#minId').value.trim(),
+    maxId:    $('input#maxId').value.trim(),
+    minDate:  $('input#minDate').value,
+    maxDate:  $('input#maxDate').value,
+    // Delays
+    searchDelay: getDelayMs('searchDelay'),
+    deleteDelay: getDelayMs('deleteDelay'),
+    // Import-mode exclusions (only meaningful when an import is loaded)
+    importedSet:                importedSet,
+    importExcludeServers:       $('input#importExcludeServers').value.trim(),
+    importExcludeChannels:      $('input#importExcludeChannels').value.trim(),
+    importExcludeUsers:         $('input#importExcludeUsers').value.trim(),
+    importExcludeAllServers:    $('input#importExcludeAllServers').checked,
+    importExcludeAllChannels:   $('input#importExcludeAllChannels').checked,
+    importExcludeAllDms:        $('input#importExcludeAllDms').checked,
+  };
+}
+
+/** Writes a snapshot back into every form input — the inverse of captureSnapshot. Called once per snapshot during a meta-batch run, before the dispatch into core. The trailing renderQueue() refreshes the top-bar synopsis to match the freshly-applied target list. */
+function applySnapshot(snap) {
+  $('input#authorId').value          = snap.authorId;
+  $('input#excludeNsfw').checked     = snap.excludeNsfw;
+  $('input#guildId').value           = snap.guildId;
+  $('input#channelId').value         = snap.channelId;
+  $('input#excludeGroupDms').checked = snap.excludeGroupDms;
+
+  $('input#search').value           = snap.content;
+  $('input#hasLink').checked        = snap.hasLink;
+  $('input#hasImage').checked       = snap.hasImage;
+  $('input#hasVideo').checked       = snap.hasVideo;
+  $('input#hasSound').checked       = snap.hasSound;
+  $('input#hasSticker').checked     = snap.hasSticker;
+  $('input#hasPoll').checked        = snap.hasPoll;
+  $('input#hasEmbed').checked       = snap.hasEmbed;
+  $('input#hasForward').checked     = snap.hasForward;
+  $('input#mentionsId').value       = snap.mentionsId;
+  $('input#mentionEveryone').checked = snap.mentionEveryone;
+  $('select#pinnedMode').value      = snap.pinnedMode;
+
+  $('input#excludeSearch').value           = snap.excludeSearch;
+  $('select#excludeMatchMode').value       = snap.excludeMatchMode;
+  $('input#excludeLink').checked           = snap.excludeLink;
+  $('input#excludeImage').checked          = snap.excludeImage;
+  $('input#excludeVideo').checked          = snap.excludeVideo;
+  $('input#excludeSound').checked          = snap.excludeSound;
+  $('input#excludeSticker').checked        = snap.excludeSticker;
+  $('input#excludePoll').checked           = snap.excludePoll;
+  $('input#excludeEmbed').checked          = snap.excludeEmbed;
+  $('input#excludeForward').checked        = snap.excludeForward;
+  $('input#excludeMentionsId').value       = snap.excludeMentionsId;
+  $('input#excludeMentionEveryone').checked = snap.excludeMentionEveryone;
+  $('input#excludeExtensions').value       = snap.excludeExtensions;
+  const pillSet = new Set(snap.excludeExtensionPills || []);
+  for (const el of ui.undiscordWindow.querySelectorAll('input[data-ext]')) {
+    el.checked = pillSet.has(el.dataset.ext);
+  }
+
+  $('input#minId').value   = snap.minId;
+  $('input#maxId').value   = snap.maxId;
+  $('input#minDate').value = snap.minDate;
+  $('input#maxDate').value = snap.maxDate;
+
+  setDelayDisplay('searchDelay', snap.searchDelay);
+  setDelayDisplay('deleteDelay', snap.deleteDelay);
+
+  $('input#importExcludeServers').value         = snap.importExcludeServers;
+  $('input#importExcludeChannels').value        = snap.importExcludeChannels;
+  $('input#importExcludeUsers').value           = snap.importExcludeUsers;
+  $('input#importExcludeAllServers').checked    = snap.importExcludeAllServers;
+  $('input#importExcludeAllChannels').checked   = snap.importExcludeAllChannels;
+  $('input#importExcludeAllDms').checked        = snap.importExcludeAllDms;
+
+  renderQueue();
+}
+
+/** Resets every form input to its default. Wired to the Reset Selection sidebar button, and called after a successful Batch Selection so the form is empty for the next snapshot. Streamer mode and Auto scroll (footer toggles) are NOT touched — those are global UI preferences, not per-batch. The log area is also untouched (use Clear Log for that). */
+function resetAllSelection() {
+  $('input#authorId').value      = '';
+  $('input#excludeNsfw').checked = false;
+  $('input#guildId').value       = '';
+  $('input#channelId').value     = '';
+  $('input#excludeGroupDms').checked = false;
+
+  $('input#search').value           = '';
+  $('input#hasLink').checked        = false;
+  $('input#hasImage').checked       = false;
+  $('input#hasVideo').checked       = false;
+  $('input#hasSound').checked       = false;
+  $('input#hasSticker').checked     = false;
+  $('input#hasPoll').checked        = false;
+  $('input#hasEmbed').checked       = false;
+  $('input#hasForward').checked     = false;
+  $('input#mentionsId').value       = '';
+  $('input#mentionEveryone').checked = false;
+  $('select#pinnedMode').value      = 'exclude';
+
+  $('input#excludeSearch').value           = '';
+  $('select#excludeMatchMode').value       = 'substring';
+  $('input#excludeLink').checked           = false;
+  $('input#excludeImage').checked          = false;
+  $('input#excludeVideo').checked          = false;
+  $('input#excludeSound').checked          = false;
+  $('input#excludeSticker').checked        = false;
+  $('input#excludePoll').checked           = false;
+  $('input#excludeEmbed').checked          = false;
+  $('input#excludeForward').checked        = false;
+  $('input#excludeMentionsId').value       = '';
+  $('input#excludeMentionEveryone').checked = false;
+  $('input#excludeExtensions').value       = '';
+  for (const el of ui.undiscordWindow.querySelectorAll('input[data-ext]')) el.checked = false;
+
+  $('input#minId').value   = '';
+  $('input#maxId').value   = '';
+  $('input#minDate').value = DISCORD_EPOCH_LOCAL;
+  $('input#maxDate').value = '';
+
+  setDelayDisplay('searchDelay', SEARCH_DEFAULT);
+  setDelayDisplay('deleteDelay', DELETE_DEFAULT);
+  undiscordCore.options.searchDelay = SEARCH_DEFAULT;
+  undiscordCore.options.deleteDelay = DELETE_DEFAULT;
+
+  $('input#importExcludeServers').value          = '';
+  $('input#importExcludeChannels').value         = '';
+  $('input#importExcludeUsers').value            = '';
+  $('input#importExcludeAllServers').checked     = false;
+  $('input#importExcludeAllChannels').checked    = false;
+  $('input#importExcludeAllDms').checked         = false;
+
+  renderQueue();
 }
 
 
@@ -1876,6 +2235,7 @@ function renderImportSummary() {
 /** Returns `{ filtered, skipReasons }` after applying every import-mode filter passed in `f`. Each rejected message is attributed to exactly one bucket. */
 function applyImportFilters(messages, f) {
   const skipReasons = {
+    allServers: 0, allChannels: 0, allDms: 0,
     servers: 0, channels: 0, dmUsers: 0,
     dateInterval: 0,
     text: 0, links: 0,
@@ -1884,8 +2244,16 @@ function applyImportFilters(messages, f) {
   };
   const filtered = [];
   for (const m of messages) {
-    // Import-only exclusions — checked first since matching here drops the
-    // record cheaply before any content / regex scanning.
+    // Type-wide exclusions (the three "Exclude all" pills above the per-ID
+    // selector lists). Checked first so whole categories short-circuit before
+    // any per-record matching runs. excludeAllChannels backs the "Exclude
+    // group DMs" pill — the option name predates the label.
+    if (f.excludeAllServers && m.guildId && m.guildId !== '@me')           { skipReasons.allServers++;  continue; }
+    if (f.excludeAllDms && m.type === 'DM')                                { skipReasons.allDms++;      continue; }
+    if (f.excludeAllChannels && m.type === 'GROUP_DM')                     { skipReasons.allChannels++; continue; }
+
+    // Per-ID exclusion lists — applied after the wildcards so each wildcard
+    // claims its skipReasons bucket before the per-ID checks can.
     if (f.excludeServersSet.size  && f.excludeServersSet.has(m.guildId))    { skipReasons.servers++;  continue; }
     if (f.excludeChannelsSet.size && f.excludeChannelsSet.has(m.channelId)) { skipReasons.channels++; continue; }
     if (f.excludeUsersSet.size && (m.type === 'DM' || m.type === 'GROUP_DM')
@@ -1921,20 +2289,23 @@ function applyImportFilters(messages, f) {
 // ============================================================================
 // ORCHESTRATORS
 // ----------------------------------------------------------------------------
-// startAction (▶︎ Delete button) reads every form input, validates, captures
-// the auth token, parses the queue, expands jobs across (target × author),
-// runs a permission pre-flight, and dispatches to undiscordCore.run() (single
-// target+author) or undiscordCore.runBatch() (multiple jobs). Routes to
-// startImportAction() when an export has been imported.
+// startAction (▶︎ Delete button) is a meta-orchestrator: it gathers every
+// queued selection snapshot (selectionQueue) plus the current form (when not
+// blank), then iterates them sequentially. Each iteration applies the snapshot
+// to the live form and dispatches to runSearchModeFromForm or
+// runImportModeFromForm based on the snapshot's mode.
+//
+// Per-snapshot dispatchers read every form input, validate, parse the queue,
+// expand jobs across (target × author), run a permission pre-flight (search
+// mode only), and call undiscordCore.run() (single target+author) or
+// undiscordCore.runBatch() (multiple jobs).
 // ============================================================================
 
-/** Import-mode entry point — peer of startAction(). Pre-filters the imported set with every applicable filter, then hands a single synthetic job carrying an ImportSource into core. */
-async function startImportAction() {
-  if (!importedSet) return log.error('Import mode active but no imported set — clear and re-import.');
-
+/** Import-mode dispatcher. Pre-filters `importedSet` with every applicable filter, then hands a single synthetic job carrying an ImportSource into core. The caller (startAction) is responsible for the log-clear and the importedSet null-check. `askForConfirmation` lets the meta-orchestrator suppress the yes/no prompt for snapshots after the first — re-prompting between selections in the same meta-batch trains the user to click Yes without reading. */
+async function runImportModeFromForm(authToken, askForConfirmation = true) {
   // Date / Messages interval: applied as a client-side pre-pass against each
   // record's ISO timestamp. Messages interval (snowflake range) wins when both
-  // are set, mirroring search-mode precedence in startAction below.
+  // are set, mirroring search-mode precedence in runSearchModeFromForm below.
   const minId = $('input#minId').value.trim();
   const maxId = $('input#maxId').value.trim();
   const minDate = $('input#minDate').value.trim();
@@ -1984,6 +2355,13 @@ async function startImportAction() {
   const excludeChannelsSet = readIdSet('importExcludeChannels');
   const excludeUsersSet    = readIdSet('importExcludeUsers');
 
+  // Type-wide pills — drop every guild message / 1:1 DM / group DM
+  // respectively. excludeAllChannels backs the "Exclude group DMs" pill;
+  // the option name predates the label.
+  const excludeAllServers  = $('input#importExcludeAllServers').checked;
+  const excludeAllDms      = $('input#importExcludeAllDms').checked;
+  const excludeAllChannels = $('input#importExcludeAllChannels').checked;
+
   const noopToggles = [];
   if ($('input#excludeSticker').checked) noopToggles.push('sticker');
   if ($('input#excludePoll').checked)    noopToggles.push('poll');
@@ -2008,6 +2386,7 @@ async function startImportAction() {
   }
 
   const { filtered, skipReasons } = applyImportFilters(importedSet.messages, {
+    excludeAllServers, excludeAllChannels, excludeAllDms,
     excludeServersSet, excludeChannelsSet, excludeUsersSet,
     minMs, maxMs,
     contentMatch, excludeLink,
@@ -2020,13 +2399,8 @@ async function startImportAction() {
     return log.error(`Filters left zero messages from the import (had ${importedSet.messages.length}). Adjust Date or Messages interval, or click "All".`);
   }
 
-  const authToken = fillToken();
-  if (!authToken) return; // fillToken already logs an error.
-
   const deleteDelay = getDelayMs('deleteDelay');
   const streamerMode = $('input#streamerMode').checked;
-
-  ui.logArea.innerHTML = '';
 
   currentJobInfo = { i: 1, n: 1 }; // import mode is always single-job
   undiscordCore.resetState();
@@ -2040,6 +2414,7 @@ async function startImportAction() {
     pinnedMode: 'include', // export records have no pin metadata; "include" is the no-op
     deleteDelay,
     streamerMode,
+    askForConfirmation,
   });
 
   const skipped = importedSet.messages.length - filtered.length;
@@ -2051,6 +2426,9 @@ async function startImportAction() {
   // Categories that are neither configured nor matched stay hidden.
   const dateConfigured = (minMs > -Infinity) || (maxMs < Infinity);
   const breakdown = [
+    ['All servers (wildcard)',    skipReasons.allServers,   excludeAllServers],
+    ['All 1:1 DMs (wildcard)',    skipReasons.allDms,       excludeAllDms],
+    ['All group DMs (wildcard)',  skipReasons.allChannels,  excludeAllChannels],
     ['Servers',                   skipReasons.servers,      excludeServersSet.size > 0],
     ['Channels',                  skipReasons.channels,     excludeChannelsSet.size > 0],
     ['DM users',                  skipReasons.dmUsers,      excludeUsersSet.size > 0],
@@ -2157,12 +2535,10 @@ function expandJobs(targets, authorList) {
   return { jobs, warnings };
 }
 
-/** Search-mode entry point. Reads every form input, validates, captures the auth token, parses the queue, expands jobs across (target × author), runs a permission pre-flight, and dispatches into core. Routes to startImportAction() when an export has been imported. */
-async function startAction() {
-  if (importedSet) return startImportAction();
-
+/** Search-mode dispatcher. Reads every form input, validates, parses the queue, expands jobs across (target × author), runs a permission pre-flight, and dispatches into core. The caller (startAction) handles the log-clear and import-mode routing. `askForConfirmation` lets the meta-orchestrator suppress the yes/no prompt for snapshots after the first. */
+async function runSearchModeFromForm(authToken, askForConfirmation = true) {
   // Edge case: empty Author ID. Fill the UI field with your own ID so the
-  // rest of startAction sees a populated input. The notice itself is deferred
+  // rest of the function sees a populated input. The notice itself is deferred
   // to onStart so it lands AFTER the "Started at..." line. Streamer mode
   // redacts the ID in the log line — the input itself is dotted out via CSS.
   const authorInput = $('input#authorId');
@@ -2223,10 +2599,7 @@ async function startAction() {
   const { authorList, minDateUsed, warning } = validation;
   if (warning) log.warn(warning);
 
-  // ---- Token + queue ----
-  const authToken = fillToken();
-  if (!authToken) return; // fillToken already logs an error.
-
+  // ---- Queue ----
   const { targets, orphans } = parseTargets();
   if (!targets.length) return log.error('You must fill the "Server ID" field!');
   if (orphans) log.warn(`${orphans} channel entr${orphans === 1 ? 'y has' : 'ies have'} no server and will be skipped. Channels need a parent server.`);
@@ -2238,8 +2611,6 @@ async function startAction() {
   // Manage Messages or Administrator on its target server. One API call total.
   const ok = await checkBatchPermissions(jobs, authToken);
   if (!ok) return;
-
-  ui.logArea.innerHTML = '';
 
   // ---- Run ----
   // Reset to 1/N — runBatch will overwrite via onJob in batch mode; single-job
@@ -2267,6 +2638,7 @@ async function startAction() {
     searchDelay,
     deleteDelay,
     streamerMode,
+    askForConfirmation,
   });
 
   if (jobs.length === 1) {
@@ -2279,6 +2651,170 @@ async function startAction() {
     try { await undiscordCore.runBatch(jobs); }
     catch (err) { log.error('CoreException', err); }
   }
+}
+
+/** Returns true when a snapshot has no targets, no import, and no author. The meta-orchestrator uses this to decide whether to append the current form as a trailing snapshot — a blank form after queued batches just runs the queue without a phantom empty pass at the end. */
+function isSnapshotBlank(snap) {
+  if (snap.importedSet) return false;
+  if (snap.guildId.trim() || snap.channelId.trim()) return false;
+  if (snap.authorId) return false;
+  return true;
+}
+
+/** Click handler for the Batch Selection sidebar button. Snapshots the current form, validates it, runs the pre-flight permission check (when a non-self author is present), pushes the snapshot onto selectionQueue, and resets the form. Failures abort without queuing — the user gets an explicit log line instead of silently building a poisoned queue. */
+async function queueSelectionAction() {
+  const snap = captureSnapshot();
+  if (isSnapshotBlank(snap)) {
+    return log.warn('Batch Selection: nothing to queue — set a target / author / import first.');
+  }
+
+  // Dedup — if an exact-match snapshot is already queued, refuse rather than
+  // silently double-queue. Compares every captured field; importedSet by
+  // identity so two snapshots over the same loaded import collide as expected.
+  const newKey = snapshotKey(snap);
+  const dupeIdx = selectionQueue.findIndex(s => snapshotKey(s) === newKey);
+  if (dupeIdx !== -1) {
+    return log.warn(`Batch Selection: this selection is identical to queued snapshot #${dupeIdx + 1} — not queueing a duplicate.`);
+  }
+
+  // Soft redundancy warning — fires when one snapshot fully subsumes the
+  // other. Never blocks; the worst case is harmless 404s on already-deleted
+  // messages, and finer-grained policing isn't ours to do.
+  for (let i = 0; i < selectionQueue.length; i++) {
+    const prior = selectionQueue[i];
+    if (snapshotASubsumesB(prior, snap)) {
+      log.warn(`Batch Selection: queued snapshot #${i + 1} already wipes everything this selection targets. Queueing anyway — this run will mostly produce 404s for already-deleted messages.`);
+    } else if (snapshotASubsumesB(snap, prior)) {
+      log.warn(`Batch Selection: this selection wipes everything in queued snapshot #${i + 1}. Queueing anyway — snapshot #${i + 1} runs first; this selection will then re-cover its scope and produce 404s on the duplicated portion.`);
+    }
+  }
+
+  // Import mode: validate the date / message-ID bounds in the same shape
+  // runImportModeFromForm does. No pre-flight — deletion runs against the
+  // user's own export only.
+  if (snap.importedSet) {
+    const { minId, maxId, minDate, maxDate } = snap;
+    if (minId && !/^\d+$/.test(minId)) return log.error(`Batch Selection: "After message ID" must be numeric, got "${minId}"`);
+    if (maxId && !/^\d+$/.test(maxId)) return log.error(`Batch Selection: "Before message ID" must be numeric, got "${maxId}"`);
+    if (minId && maxId && BigInt(minId) >= BigInt(maxId)) {
+      return log.error('Batch Selection: "After message ID" must be older than "Before message ID".');
+    }
+    if (minDate && Number.isNaN(new Date(minDate).getTime())) return log.error('Batch Selection: invalid "After date".');
+    if (maxDate && Number.isNaN(new Date(maxDate).getTime())) return log.error('Batch Selection: invalid "Before date".');
+
+    selectionQueue.push(snap);
+    renderQueueBadge();
+    log.info(`Queued selection #${selectionQueue.length} (import mode).`);
+    resetAllSelection();
+    return;
+  }
+
+  // Search-mode snapshots: full validation + pre-flight.
+  const validation = validateRunInputs({
+    minId:           snap.minId,
+    maxId:           snap.maxId,
+    authorId:        snap.authorId,
+    mentions:        snap.mentionsId,
+    excludeMentions: snap.excludeMentionsId,
+    content:         snap.content,
+    excludeContent:  snap.excludeSearch,
+    minDate:         snap.minDate,
+    maxDate:         snap.maxDate,
+  });
+  if (validation.error) return log.error(`Batch Selection: ${validation.error}`);
+
+  const authToken = fillToken();
+  if (!authToken) return;
+
+  // parseTargets reads the live form. captureSnapshot ran milliseconds ago
+  // against the same fields, so the values match the snapshot we're queuing.
+  const { targets } = parseTargets();
+  if (!targets.length) return log.error('Batch Selection: queue is empty — add a server, channel, or DM first.');
+
+  // Empty Author ID defaults to self at run time (matches startAction).
+  const authorList = validation.authorList.length ? validation.authorList : [getAuthorId() || ''].filter(Boolean);
+  const { jobs } = expandJobs(targets, authorList);
+
+  const ok = await checkBatchPermissions(jobs, authToken);
+  if (!ok) {
+    log.error('Batch Selection: snapshot rejected — pre-flight permission check failed (see above). Selection NOT queued.');
+    return;
+  }
+
+  selectionQueue.push(snap);
+  renderQueueBadge();
+  log.info(`Queued selection #${selectionQueue.length} — ${jobs.length} job${jobs.length === 1 ? '' : 's'} ready.`);
+  resetAllSelection();
+}
+
+/** Meta-orchestrator wired to the ▶︎ Delete button. Builds the list of snapshots to run (queued first, current form last unless it's blank), then iterates and dispatches each via runSearchModeFromForm or runImportModeFromForm. Each dispatch is independent — core.resetState/resetOptions per call prevents state bleed. The selectionQueue drains when the meta-batch finishes (or stops mid-way) so subsequent runs start clean. */
+async function startAction() {
+  if (undiscordCore.state.running) return log.warn('A run is already in progress.');
+
+  const authToken = fillToken();
+  if (!authToken) return;
+
+  const snapshots = [...selectionQueue];
+  const currentSnap = captureSnapshot();
+  if (!isSnapshotBlank(currentSnap)) snapshots.push(currentSnap);
+
+  if (snapshots.length === 0) {
+    return log.error('Nothing to run — set up a selection (or queue one) first.');
+  }
+
+  ui.logArea.innerHTML = '';
+
+  const total = snapshots.length;
+  if (total > 1) log.info(`Meta-batch: running ${total} selection${total === 1 ? '' : 's'} sequentially.`);
+
+  // Confirmation prompt fires only on the first selection. The user already
+  // confirmed the intent of running the queued batches when they hit Delete;
+  // re-prompting between snapshots would just train them to click "Yes" without
+  // reading. Declining the first prompt aborts the entire meta-batch.
+  let confirmationConsumed = false;
+
+  for (let i = 0; i < snapshots.length; i++) {
+    const snap = snapshots[i];
+    if (total > 1) log.info(`══════ Selection ${i + 1}/${total} ══════`);
+
+    // Replay into the live form so the dispatchers (which read from form
+    // elements) see the snapshot's values. Restore importedSet too, since
+    // mode dispatch is keyed off it.
+    applySnapshot(snap);
+    importedSet = snap.importedSet;
+    if (importedSet) {
+      ui.undiscordWindow.classList.add('import-mode');
+      $('#importBadge').style.display = 'inline-flex';
+    } else {
+      ui.undiscordWindow.classList.remove('import-mode');
+      $('#importBadge').style.display = 'none';
+    }
+    renderImportSummary();
+
+    const askForConfirmation = !confirmationConsumed;
+    if (importedSet) await runImportModeFromForm(authToken, askForConfirmation);
+    else             await runSearchModeFromForm(authToken, askForConfirmation);
+
+    // user-declined (first prompt) and user-stopped (Stop mid-run) both
+    // abort the remaining meta-batch — barging on after either would betray
+    // the user's intent.
+    if (undiscordCore.state.endReason === 'user-declined') {
+      if (i < snapshots.length - 1) {
+        log.warn(`Meta-batch aborted at selection ${i + 1}/${total} — ${total - i - 1} remaining selection${total - i - 1 === 1 ? '' : 's'} skipped (you declined the confirmation prompt).`);
+      }
+      break;
+    }
+    if (undiscordCore.state.endReason === 'user-stopped' && i < snapshots.length - 1) {
+      log.warn(`Meta-batch stopped at selection ${i + 1}/${total} — ${total - i - 1} remaining selection${total - i - 1 === 1 ? '' : 's'} skipped.`);
+      break;
+    }
+
+    confirmationConsumed = true;
+  }
+
+  selectionQueue = [];
+  renderQueueBadge();
+  if (total > 1) log.info('Meta-batch finished.');
 }
 
 /** Click handler for the 🛑 Stop button. Forwards to core.stop(). */

@@ -23,8 +23,14 @@
                 <button id="verify" class="verify-mode" title="Print the current run configuration to the log so you can sanity-check it before clicking Delete.">📋 Verify</button>
                 <button id="clear" title="Clear the log area">🗑️ Clear Log</button>
             </div>
+            <div id="sidebarSelectionRow">
+                <button id="resetSelection" class="reset-selection" title="Reset every input field in the sidebar to its default value (does not clear the log or any queued batches).">↺ Reset Selection</button>
+                <button id="queueSelection" class="queue-selection" title="Snapshot the current selection as a queued batch, then reset the form. Click ▶︎ Delete to run all queued batches sequentially. Pre-flight runs at queue time when non-self authors are present.">Batch Selection +</button>
+            </div>
             <div id="sidebarBadgeRow">
                 <span id="importBadge" class="import-badge" style="display:none;" title="An imported export is loaded. The General queue, Search filter, and Delete filter sections are ignored — only Date and Messages interval still apply.">import mode</span>
+                <button id="dropBatches" class="drop-batches" style="display:none;" title="Discard every queued batch. Does not affect the current form.">drop batches</button>
+                <span id="queueBadge" class="queue-badge" style="display:none;" title="Number of selection snapshots queued. Click ▶︎ Delete to run them sequentially.">queued: 0</span>
             </div>
             <hr>
             <details id="sectionGeneral" open>
@@ -33,7 +39,7 @@
                     <legend>Author ID</legend>
                     <button class="help-btn" data-help="authorId" title="Show help for Author ID">Help</button>
                     <div class="input-wrapper">
-                        <input class="input clearable" id="authorId" type="text">
+                        <input class="input clearable" id="authorId" type="text" placeholder="Author ID(s)">
                         <button class="clear-btn" id="clearAuthor" title="Clear Author ID">Clear</button>
                     </div>
                     <div class="input-actions">
@@ -52,7 +58,7 @@
                     <legend>Server ID</legend>
                     <button class="help-btn" data-help="serverId" title="Show help for Server ID">Help</button>
                     <div class="input-wrapper">
-                        <input class="input clearable" id="guildId" type="text">
+                        <input class="input clearable" id="guildId" type="text" placeholder="Server ID(s)">
                         <button class="clear-btn" id="clearGuild" title="Clear Server (also clears Channel)">Clear</button>
                     </div>
                     <div class="input-actions">
@@ -65,7 +71,7 @@
                     <legend>Channel ID</legend>
                     <button class="help-btn" data-help="channelId" title="Show help for Channel ID">Help</button>
                     <div class="input-wrapper">
-                        <input class="input clearable" id="channelId" type="text">
+                        <input class="input clearable" id="channelId" type="text" placeholder="Channel ID(s)">
                         <button class="clear-btn" id="clearChannel" title="Clear Channel only">Clear</button>
                     </div>
                     <div class="input-actions">
@@ -101,12 +107,27 @@
                         <button id="importClear" title="Clear the loaded import and return to live-search mode">Clear Import</button>
                     </div>
                     <div id="importSummary" class="sectionDescription" style="margin-top: 6px;">No import loaded.</div>
+                    <div class="pill-group-label">Exclude all</div>
+                    <div class="import-type-pills">
+                        <label class="pill" title="Drop every guild (server) message during deletion-queue construction. Default: off.">
+                            <input id="importExcludeAllServers" type="checkbox">
+                            Exclude servers
+                        </label>
+                        <label class="pill" title="Drop every 1:1 DM during deletion-queue construction. Default: off.">
+                            <input id="importExcludeAllDms" type="checkbox">
+                            Exclude DMs
+                        </label>
+                        <label class="pill" title="Drop every group DM (multi-recipient channel under @me) during deletion-queue construction. Default: off.">
+                            <input id="importExcludeAllChannels" type="checkbox">
+                            Exclude group DMs
+                        </label>
+                    </div>
                 </fieldset>
                 <fieldset>
                     <legend>Exclude Server</legend>
                     <button class="help-btn" data-help="importExcludeServer" title="Show help for Exclude Server">Help</button>
                     <div class="input-wrapper">
-                        <input class="clearable" id="importExcludeServers" type="text" placeholder="Server ID(s) to skip — comma-separated">
+                        <input class="clearable" id="importExcludeServers" type="text" placeholder="Server ID(s) to skip">
                         <button class="clear-btn" id="clearImportExcludeServers" title="Clear excluded servers">Clear</button>
                     </div>
                     <div class="input-actions">
@@ -119,7 +140,7 @@
                     <legend>Exclude Channel</legend>
                     <button class="help-btn" data-help="importExcludeChannel" title="Show help for Exclude Channel">Help</button>
                     <div class="input-wrapper">
-                        <input class="clearable" id="importExcludeChannels" type="text" placeholder="Channel ID(s) to skip — comma-separated">
+                        <input class="clearable" id="importExcludeChannels" type="text" placeholder="Channel ID(s) to skip">
                         <button class="clear-btn" id="clearImportExcludeChannels" title="Clear excluded channels">Clear</button>
                     </div>
                     <div class="input-actions">
@@ -132,7 +153,7 @@
                     <legend>Exclude DM with User</legend>
                     <button class="help-btn" data-help="importExcludeUser" title="Show help for Exclude DM with User">Help</button>
                     <div class="input-wrapper">
-                        <input class="clearable" id="importExcludeUsers" type="text" placeholder="User ID(s) — DMs/group DMs with these users will skip">
+                        <input class="clearable" id="importExcludeUsers" type="text" placeholder="User ID(s) to skip">
                         <button class="clear-btn" id="clearImportExcludeUsers" title="Clear excluded users">Clear</button>
                     </div>
                     <div class="input-actions">
@@ -247,7 +268,7 @@
                         <label><input id="excludeMentionEveryone" type="checkbox">skip @everyone / @here</label>
                     </div>
                     <div class="input-wrapper">
-                        <input class="clearable" id="excludeMentionsId" type="text" placeholder="Mentions user ID">
+                        <input class="clearable" id="excludeMentionsId" type="text" placeholder="User ID(s) to skip">
                         <button class="clear-btn" id="clearExcludeMentions" title="Clear Skip mentions user IDs">Clear</button>
                     </div>
                     <div class="input-actions">
@@ -262,14 +283,14 @@
                     <legend>Interval of messages</legend>
                     <button class="help-btn" data-help="messagesInterval" title="Show help for Messages interval">Help</button>
                     <div class="input-wrapper">
-                        <input class="clearable" id="minId" type="text" placeholder="After a message ID">
+                        <input class="clearable" id="minId" type="text" placeholder="After message ID">
                         <button class="clear-btn" id="clearMinId" title="Clear After message ID">Clear</button>
                     </div>
                     <div class="input-actions" style="margin-bottom: 5px;">
                         <button id="selectMinId" title="Click, then click a message in Discord to capture its ID as the After bound">Select</button>
                     </div>
                     <div class="input-wrapper">
-                        <input class="clearable" id="maxId" type="text" placeholder="Before a message ID">
+                        <input class="clearable" id="maxId" type="text" placeholder="Before message ID">
                         <button class="clear-btn" id="clearMaxId" title="Clear Before message ID">Clear</button>
                     </div>
                     <div class="input-actions">

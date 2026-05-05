@@ -862,6 +862,15 @@ body.undiscord-selecting * { cursor: crosshair !important; }
   text-security: disc;
 }
 
+/* Dual-span redaction for log lines. Every log redaction emits both a `.sm-real`
+   span (the actual value) and a `.sm-redacted` span (the dotted placeholder);
+   CSS shows exactly one of them based on whether `.streamer-on` is set on the
+   panel root. Toggling streamer mode mid-run instantly re-renders every
+   already-printed log line — no log replay needed. */
+#undiscord .sm-redacted { display: none; }
+#undiscord.streamer-on .sm-real { display: none; }
+#undiscord.streamer-on .sm-redacted { display: inline; }
+
 /* ============================================================================
  * SIDEBAR ACTION GROUP
  * ----------------------------------------------------------------------------
@@ -884,13 +893,124 @@ body.undiscord-selecting * { cursor: crosshair !important; }
   min-height: 38px;
   padding: 2px 6px;
 }
-/* Center the import-mode badge (when shown) directly below the action buttons.
-   When the badge is hidden the row still occupies a few px of vertical space
-   above the <hr> — visually negligible (~4px), and avoids the fragility of
-   selecting on inline display:none across HTML/JS serialization quirks. */
+
+/* Reset / Batch selection row — two equally-wide buttons under the Delete /
+   Verify / Clear log group. Reset Selection wipes the form back to defaults;
+   Batch Selection snapshots the form into the meta-batch queue and resets. */
+#undiscord #sidebarSelectionRow {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+#undiscord #sidebarSelectionRow > button {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  height: 32px;
+  min-height: 32px;
+  padding: 2px 6px;
+}
+#undiscord .reset-selection { background-color: #4e5058; }
+/* Same forest green as the per-section Add buttons — reads as "additive"
+   alongside Reset Selection's neutral grey. The queue count lives in the
+   amber badge below, not in the button label. */
+#undiscord .queue-selection { background-color: #3a7d4d; }
+
+/* Centred badge row directly below the action buttons. When every badge is
+   hidden the row still occupies a few px of vertical space above the <hr> —
+   visually negligible (~4px), and avoids the fragility of selecting on inline
+   display:none across HTML/JS serialization quirks. */
 #undiscord #sidebarBadgeRow {
   text-align: center;
   margin-bottom: 4px;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Queue counter badge — shown next to the import-mode chip when one or more
+   selection snapshots are queued. Same pill geometry, different colour so the
+   two states are visually distinct at a glance. */
+#undiscord #queueBadge.queue-badge {
+  background: #b8860b;
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+  font-family: var(--_u-font-display);
+}
+
+/* Drop-batches chip — same pill geometry as the queue counter, but bordeaux
+   red (matching the global Delete button accents elsewhere) since it's
+   destructive. Shown to the left of the queue counter only when the queue
+   is non-empty. Overrides the global #undiscord button rules so it sizes as
+   a chip rather than a 60×32 button. */
+#undiscord #dropBatches.drop-batches {
+  background: #722f37;
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin: 0;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+  font-family: var(--_u-font-display);
+  cursor: pointer;
+}
+
+/* Mini-header for grouped pill toggles ("Exclude all" above the import-mode
+   wildcards). Mirrors the legend look — uppercase, label colour, modest size
+   — without the full fieldset border, since these pills are a sub-group of
+   their parent fieldset rather than a peer. */
+#undiscord .pill-group-label {
+  margin-top: 12px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--_u-text-label);
+}
+
+/* Import-mode exclusion pills — three checkboxes styled as compact toggles
+   beneath the Exclude-all mini-header. Reuses the global pill checkbox visual
+   but arranges them in a horizontal grid that wraps on narrow widths. */
+#undiscord .import-type-pills {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+#undiscord .import-type-pills label.pill {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 0;
+  text-transform: none;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--_u-text-label);
+}
+#undiscord .import-type-pills label.pill input[type="checkbox"] {
+  margin-right: 6px;
 }
 
 /* ============================================================================
