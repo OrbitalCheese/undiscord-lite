@@ -93,7 +93,7 @@ Open/reload Discord afterwards. A trash icon mounts in Discord's left rail just 
 
 Open the panel with the trash icon or `Ctrl+Shift+D`. The panel is draggable by its header and resizable from any edge or corner.
 
-![alt text](readmeImages/{449D24F2-1C45-4B1E-9F3E-AF2927BB247D}.png)
+![alt text](readmeImages/{85CADD6F-C823-4557-BC1C-FB8017936BC2}.png)
 
 ### Author ID
 
@@ -109,7 +109,7 @@ Server ID and Channel ID each have three control buttons plus a `Clear` button i
 - **`Select`** — enters point-and-click capture mode. The next click on a server icon / channel / message in Discord drops its ID into the field. Hold Shift to keep capturing without exiting.
 - **`Delete`** — removes the current target from the queue. Removing the last channel under a server widens it back to a server-wide wipe.
 
-![alt text](readmeImages/{F247CB82-8F22-4286-917F-368798B40212}.png)
+![alt text](readmeImages/{689E2080-8D21-4AC4-909C-E321E28E5FAD}.png)
 
 Mix and match across as many servers as you want — order doesn't matter, the queue display groups everything by server.
 
@@ -125,9 +125,12 @@ Mix and match across as many servers as you want — order doesn't matter, the q
 
 Hit **`▶︎ Delete`**. On the first job, a confirmation dialog shows you the estimated message count, estimated time, and a preview of what's about to be deleted. Subsequent jobs in the same batch don't re-prompt.
 
+![alt text](readmeImages/{D836ABCB-8787-4B47-AD8C-39DBAC1C16CD}.png)
+
 The trash icon (whether mounted in the server bar or shown as the fallback FAB) turns red while a run is active and shows a thin progress bar. Click **`🛑 Stop`** at any time — the in-flight delay aborts immediately, no need to sit through the current sleep.
 
-![alt text](readmeImages/{F13378F4-AB38-48D5-88D2-BF5E36C162BE}.png)
+![alt text](readmeImages/{B7A8E2EC-BEB7-475B-BAE5-375CBB849FB2}.png)
+
 
 ### Batching multiple selections
 
@@ -164,9 +167,13 @@ Collapsible sidebar sections:
 
 - **Search filter** — narrow what comes back from Discord's search: content text, attachment types (link / image / video / sound / sticker / poll / embed / forwarded), `@everyone / @here` pings, pinned mode, and a single `@user` mention.
 
+![alt text](readmeImages/{142A765D-C0EB-4CB6-9EEB-5E81DD6C5028}.png)
+
 - **Delete filter** — drops messages from the queue *after* the search returns them: skip-text (substring or exact-word), the same set of attachment toggles, `@everyone / @here`, and a list of `@user` mentions to skip.
   - **Skip extension** — eight preset pills for the most-shared file types (`.jpg .png .mp4 .webm .pdf .docx .txt .zip`) plus a custom semicolon-separated textbox for anything else (`.psd;.dmg;.iso`). Whitespace trimmed, case normalized, leading dots optional. Any single attachment match drops the whole message.
   - **Skip Image / Skip Video** category toggles auto-tick the matching extension presets (`.jpg`+`.png` / `.mp4`+`.webm`); unticking any preset clears the parent toggle.
+
+![alt text]({74A43ADC-CD56-4D74-B308-22DACD8A5940}.png)
 
 > **@Mentions asymmetry.** The Search filter's <kbd>Include @user</kbd> field accepts **one** ID — Discord's `mentions=` query param only filters by a single mentioned user per request. The Delete filter's <kbd>Skip @user</kbd> field accepts **any number** of comma-separated IDs, because the skip is a client-side check after the response: every listed ID is matched against each message's mentions. So if you queue a 10k-message run and want to skip three @users, list all three on the Skip side and they'll all be honored in one pass.
 
@@ -176,9 +183,13 @@ Collapsible sidebar sections:
 
 - **Date interval** — datetime pickers, auto-converted to snowflakes. Ignored if you also fill in Messages interval — the snowflake range wins.
 
+![alt text](readmeImages/{E3B1720A-FBB5-471E-83F0-B1411F4FC79E}.png)
+
 - **Delay settings** — search delay (default 45s) and delete delay (default 1s) steppers set your *baseline*. Click the arrows or type a value directly (auto-clamped to the field's range). The script auto-bumps both on 429s and decays back toward it as deletes succeed. Lower delays = faster, but more throttling.
 
 - **Import data export** — pre-load message IDs from your Discord data export and skip the search phase entirely (~3-5x faster on large wipes; no search-index-lag failure modes). See [Import mode](#import-mode) below.
+
+![alt text]({41CA0C22-16F4-4AFC-9E8F-9AC0446BAEDB}.png)
 
 > Discord's UI requires dev mode to be on to copy raw message IDs — only a message *link* can be copied otherwise. The textbox auto-strips the link down to the message ID, so you *can* just paste it in there with no problems.
 >
@@ -187,8 +198,6 @@ Collapsible sidebar sections:
 ## Import mode
 
 If you've already requested your Discord data (User Settings → Privacy & Safety → **Request All My Data**), the resulting ZIP contains a complete index of every message you've ever sent. Import mode reads that index directly and skips Discord's search API entirely — turning a multi-hour wipe into a lightning fast delete-only run.
-
-![alt text](readmeImages/{DB74C906-69C2-40EA-980D-CC0466B418F3}.png)
 
 **How to use it:**
 
