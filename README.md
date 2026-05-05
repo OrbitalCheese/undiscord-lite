@@ -28,7 +28,7 @@ Read:
 
 - [How long Discord keeps your information](https://support.discord.com/hc/en-us/articles/5431812448791-How-long-Discord-keeps-your-information) — official support article
 - [Local-law addenda](https://discord.com/terms/local-laws#5) — region-specific TOS clauses
-- [Privacy Policy](https://discord.com/privacy%20policy) — the headline document
+- [Privacy Policy](https://discord.com/privacy) — the headline document
 
 If you live in the EU (Yes, including the Yookay.), Switzerland, South Korea, or Brazil and are worried about what you posted in a server you no longer have access to, you can exercise your legal right to have your data DELETED directly.
 
@@ -36,7 +36,7 @@ I recommend you do this every now and again regardless, since deleting a message
 
 The best way to go about this, especially in the EU, is to email the data protection officer directly at `dpo@discord.com`. Ask the question to `privacy@discord.com` if you're unsure of how it works in your jurisdiction. Send the email from the address associated with your Discord account for faster service. Archive your correspondence. If they get caught ignoring legal obligations you'll have proof that you were harmed by their misconduct. 
 
-If you live in the US however…
+If you live in the US, however…
 
 ![Brother](readmeImages/image.png)
 
@@ -44,7 +44,7 @@ You're fully at the mercy of the TOS of the super corpo Discord Inc. they have f
 
 They *might* honor your request if you say pretty please and write them a nice email. Maybe Venmo support a tip and include a prayer for their sickly mother. But other than that, the best you can do is prevent getting into that situation to begin with — wipe your messages at least once a week. And even then, anything that's already in their training pipeline is doomed to ride out the next couple of years inside an AI dataset.
 
-I only plan to update it if it breaks severely, there are enough safety guards built in to survive most changes to Discord with graceful degradation of the convenience features while retaining core functionality.
+I only plan to update it if it breaks severely; there are enough safety guards built in to survive most changes to Discord with graceful degradation of the convenience features while retaining core functionality.
 
 ## Features
 
@@ -193,11 +193,11 @@ Collapsible sidebar sections:
 
 > Discord's UI requires dev mode to be on to copy raw message IDs — only a message *link* can be copied otherwise. The textbox auto-strips the link down to the message ID, so you *can* just paste it in there with no problems.
 >
-> Around 30s is the practical floor for the search delay. Below that, Discord returns smaller batches per call until you're retrying more often than deleting. **40-45s search + 0.5–1s delete** is the sweet spot for consistent results.
+> Around 30s is the practical floor for the search delay. Below that, Discord returns smaller batches per call until you're retrying more often than deleting. **40–45s search + 0.5–1s delete** is the sweet spot for consistent results.
 
 ## Import mode
 
-If you've already requested your Discord data (User Settings → Privacy & Safety → **Request All My Data**), the resulting ZIP contains a complete index of every message you've ever sent. Import mode reads that index directly and skips Discord's search API entirely — turning a multi-hour wipe into a lightning fast delete-only run.
+If you've already requested your Discord data (User Settings → Privacy & Safety → **Request All My Data**), the resulting ZIP contains a complete index of every message you've ever sent. Import mode reads that index directly and skips Discord's search API entirely — turning a multi-hour wipe into a lightning-fast delete-only run.
 
 **How to use it:**
 
@@ -230,7 +230,7 @@ If you've already requested your Discord data (User Settings → Privacy & Safet
 - Channels you've since lost access to (banned, channel deleted, server deleted) → 403; same treatment.
 - Group DMs and one-on-one DMs are included if your export contains them. (Excluding just *one* participant of a group DM will skip the whole group.)
 
-**Privacy:** the export is parsed locally in your browser (`FileReader.text()`). Nothing is uploaded — there is no code path that sends imported data anywhere. The same `grep` rules in the [Privacy](#privacy) section catch any regression of this guarantee.
+**Privacy:** the export is parsed locally in your browser (`Blob.text()`). Nothing is uploaded — there is no code path that sends imported data anywhere. The same `grep` rules in the [Privacy](#privacy) section catch any regression of this guarantee.
 
 ## How it works
 
@@ -262,22 +262,22 @@ Every step that touches the network is one of four `fetch()` calls listed in the
 >
 > Running unverified code off the internet is a recipe for disaster. Independently verify every claim made below. Don't run the code if you don't understand what it's doing, or don't trust the source.
 >
-> I am just some guy on the internet. I am NOT a trust-worthy source.
+> I am just some guy on the internet. I am NOT a trustworthy source.
 
 **Short version:** your auth token is never stored, never logged, and never sent anywhere except `discord.com`.
 
 The longer version, in case you want to verify it yourself (you should):
 
 - **Where the token comes from.** Read from Discord's own `localStorage` via a same-origin iframe (Discord blocks direct page access, but iframes inherit the parent origin's storage — standard workaround). Same token Discord's own client uses.
-  - `getToken()` — [`src/helpers.js:130`](src/helpers.js#L130)
-  - iframe storage helper — [`src/helpers.js:121`](src/helpers.js#L121)
+  - `getToken()` — [`src/helpers.js:135`](src/helpers.js#L135)
+  - iframe storage helper — [`src/helpers.js:126`](src/helpers.js#L126)
 
 - **Where the token goes.** Held in a JavaScript variable (`options.authToken`) for the duration of the run. Used only as the `Authorization` header on `fetch()` calls to `https://discord.com/api/v9/...`. The codebase has exactly four `fetch()` call sites — search, delete, the DM-list lookup behind the `Add DMs` button, and the pre-flight permission check for multi-author batching — all four pointing at `discord.com`.
-  - `authToken` field declaration — [`src/undiscord-core.js:37`](src/undiscord-core.js#L37)
-  - search call — [`src/undiscord-core.js:488`](src/undiscord-core.js#L488) *(Authorization header at [line 519](src/undiscord-core.js#L519))*
-  - delete call — [`src/undiscord-core.js:755`](src/undiscord-core.js#L755) *(Authorization header at [line 757](src/undiscord-core.js#L757))*
-  - DM-list lookup — [`src/undiscord-ui.js:584`](src/undiscord-ui.js#L584) *(Authorization header at [line 585](src/undiscord-ui.js#L585))*
-  - permission pre-flight — [`src/undiscord-ui.js:1704`](src/undiscord-ui.js#L1704) *(Authorization header at [line 1705](src/undiscord-ui.js#L1705))*
+  - `authToken` field declaration — [`src/undiscord-core.js:38`](src/undiscord-core.js#L38)
+  - search call — [`src/undiscord-core.js:489`](src/undiscord-core.js#L489) *(Authorization header at [line 520](src/undiscord-core.js#L520))*
+  - delete call — [`src/undiscord-core.js:763`](src/undiscord-core.js#L763) *(Authorization header at [line 765](src/undiscord-core.js#L765))*
+  - DM-list lookup — [`src/undiscord-ui.js:607`](src/undiscord-ui.js#L607) *(Authorization header at [line 608](src/undiscord-ui.js#L608))*
+  - permission pre-flight — [`src/undiscord-ui.js:2118`](src/undiscord-ui.js#L2118) *(Authorization header at [line 2119](src/undiscord-ui.js#L2119))*
   - verify yourself — should return exactly four hits, all under `discord.com`:
     ```bash
     grep -rn 'fetch(' src/
@@ -301,10 +301,10 @@ The longer version, in case you want to verify it yourself (you should):
   - dependency manifest — [`package.json`](package.json) (no `dependencies` or `devDependencies` blocks)
 
 - **What gets logged locally.** The panel's log shows usernames, message content, attachment metadata, and message IDs as items are deleted (so you can confirm what's happening). It's rendered into the DOM in your own tab — not transmitted, not persisted, and wiped when you click **Clear Log** or close the tab. Auto-trims at 1000 entries.
-  - log renderer — [`src/undiscord-ui.js:1584`](src/undiscord-ui.js#L1584) (`printLog`)
-  - auto-trim limit — [`src/undiscord-ui.js:1581`](src/undiscord-ui.js#L1581) (`LOG_MAX_ENTRIES`)
+  - log renderer — [`src/undiscord-ui.js:1667`](src/undiscord-ui.js#L1667) (`printLog`)
+  - auto-trim limit — [`src/undiscord-ui.js:1664`](src/undiscord-ui.js#L1664) (`LOG_MAX_ENTRIES`)
 
-- **Auditable.** The bundled script is ~3,750 lines of readable JavaScript in one file ([`undiscord-lite.user.js`](undiscord-lite.user.js)). No minification, no obfuscation. Open it in any text editor before installing.
+- **Auditable.** The bundled script is ~4,350 lines of readable JavaScript in one file ([`undiscord-lite.user.js`](undiscord-lite.user.js)). No minification, no obfuscation. Open it in any text editor before installing.
 
 ## Build
 
