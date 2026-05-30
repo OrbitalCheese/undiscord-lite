@@ -5,6 +5,7 @@
 // @namespace   https://github.com/OrbitalCheese/undiscord-lite
 // @match       https://*.discord.com/app
 // @match       https://*.discord.com/channels/*
+// @match       https://*.discord.com/login/
 // @grant       none
 // @author      OrbitalCheese
 // @license     MIT
