@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Undiscord Lite
 // @description Bulk-delete Discord messages. Zero-dependency personal fork of Undiscord with multi-server batching.
-// @version     1.1.0
+// @version     1.1.1
 // @namespace   https://github.com/OrbitalCheese/undiscord-lite
 // @match       https://*.discord.com/app
 // @match       https://*.discord.com/channels/*
