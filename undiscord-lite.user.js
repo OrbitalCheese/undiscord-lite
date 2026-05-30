@@ -6,6 +6,7 @@
 // @match       https://*.discord.com/app
 // @match       https://*.discord.com/channels/*
 // @match       https://*.discord.com/login/
+// @match       https://*.discord.com/*
 // @grant       none
 // @author      OrbitalCheese
 // @license     MIT

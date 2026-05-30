@@ -22,7 +22,8 @@
     "match": [
       "https://*.discord.com/app",
       "https://*.discord.com/channels/*",
-      "https://*.discord.com/login/"
+      "https://*.discord.com/login/",
+      "https://*.discord.com/*"
     ],
     "grant": "none",
     "downloadURL": "https://raw.githubusercontent.com/OrbitalCheese/undiscord-lite/master/undiscord-lite.user.js",
